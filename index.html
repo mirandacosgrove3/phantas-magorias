@@ -586,7 +586,7 @@ function openWin(it, x, y) {
   }
 }
 
-/* ================= fullscreen: two-finger tap on empty space, or the F key ================= */
+/* ================= empty-space taps: 2 fingers = reset, 3 fingers = fullscreen (or the F key) ================= */
 function toggleFullscreen() {
   const d = document, el = d.documentElement;
   const isFs = d.fullscreenElement || d.webkitFullscreenElement;
@@ -595,20 +595,26 @@ function toggleFullscreen() {
     else (el.requestFullscreen || el.webkitRequestFullscreen).call(el);
   } catch (err) { console.warn('fullscreen not available', err); }
 }
-let twoTap = null;
+let multiTap = null;
 list.addEventListener('touchstart', e => {
-  if (e.touches.length === 2 && ![...e.touches].some(t => t.target.closest && t.target.closest('.t'))) {
-    twoTap = { t: performance.now(), x: e.touches[0].clientX, y: e.touches[0].clientY };
+  if (editing) { multiTap = null; return; }
+  const onTitle = [...e.touches].some(t => t.target.closest && t.target.closest('.t'));
+  if (e.touches.length >= 2 && !onTitle) {
+    if (!multiTap) multiTap = { t: performance.now(), x: e.touches[0].clientX, y: e.touches[0].clientY, n: 0 };
+    multiTap.n = Math.max(multiTap.n, e.touches.length);
     if (lp) { clearTimeout(lp); lp = null; }
-  } else if (e.touches.length > 2) twoTap = null;
+  } else if (onTitle) multiTap = null;
 }, { passive: true });
 list.addEventListener('touchmove', e => {
-  if (twoTap && Math.hypot(e.touches[0].clientX - twoTap.x, e.touches[0].clientY - twoTap.y) > 12) twoTap = null;
+  if (multiTap && Math.hypot(e.touches[0].clientX - multiTap.x, e.touches[0].clientY - multiTap.y) > 14) multiTap = null;
 }, { passive: true });
 list.addEventListener('touchend', e => {
-  if (twoTap && e.touches.length === 0) {
-    if (performance.now() - twoTap.t < 400) toggleFullscreen();
-    twoTap = null;
+  if (multiTap && e.touches.length === 0) {
+    if (performance.now() - multiTap.t < 450) {
+      if (multiTap.n === 2) resetAll();
+      else if (multiTap.n === 3) toggleFullscreen();
+    }
+    multiTap = null;
   }
 });
 document.addEventListener('keydown', e => {
@@ -816,14 +822,18 @@ document.addEventListener('keydown', e => {
   if (editing) return;
   if (e.code !== 'Space' && e.key !== ' ') return;
   e.preventDefault();
+  resetAll();
+});
+function resetAll() {
+  if (editing) return;
   [...wins].forEach(o => { o.closed = true; o.v.pause(); o.v.removeAttribute('src'); o.v.load(); o.el.remove(); });
   wins.length = 0;
   audible = null;
   activeWin = null;
   for (const it of items) if (it.row) { it.anim = (it.anim || 0) + 1; it.row.classList.remove('active', 'collapsed'); it.txt.textContent = it.title; }
   z = 10;
-  window.scrollTo(0, 0);
-});
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
 
 /* ================= boot ================= */
 (async () => {
