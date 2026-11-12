@@ -37,8 +37,10 @@
   .t.active .txt { color: #ff6fb5; }
   .t .ln {
     display: inline-block; vertical-align: middle;
-    width: 0; height: 1px; background: #fff;
-    transition: width .2s ease;
+    width: 0; height: 1.5px; border-radius: 1px;
+    background: var(--c, #fff);
+    box-shadow: 0 0 6px var(--c, transparent);
+    transition: width .2s ease, background .3s ease;
   }
   .t.collapsed .ln { width: 1.6em; }
 
@@ -71,11 +73,77 @@
     border-bottom: 1px solid rgba(255,255,255,.8);
   }
   #pick { display: none; }
+
+  /* ---- rename mode ---- */
+  .t.editing { background: linear-gradient(90deg, rgba(255,111,181,.12), rgba(255,111,181,0) 60%); }
+  .t.editing .etxt { color: #ff6fb5; }
+  .t .eext { color: rgba(255,111,181,.45); }
+  .caret {
+    display: inline-block; width: 1px; height: 1.05em;
+    vertical-align: -0.18em; margin: 0 1px; background: #ff6fb5;
+    animation: blink 1s steps(1) infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+  .t.saved .txt { color: #2ee6d2; }
+  .t.canceled .txt { color: #ff3b4a; }
+
+  /* ---- glass keyboard ---- */
+  #kb {
+    position: fixed; left: 50%;
+    bottom: calc(14px + env(safe-area-inset-bottom));
+    width: min(960px, calc(100vw - 24px));
+    box-sizing: border-box; padding: 12px 14px 16px;
+    border-radius: 30px; z-index: 100000;
+    background: linear-gradient(180deg, rgba(255,255,255,.15), rgba(255,255,255,.05));
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    backdrop-filter: blur(28px) saturate(180%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.38), inset 0 -1px 0 rgba(255,255,255,.06),
+                0 0 0 .5px rgba(255,255,255,.22), 0 24px 70px rgba(0,0,0,.55);
+    transform: translate(-50%, 125%); opacity: 0; pointer-events: none;
+    transition: transform .46s cubic-bezier(.2,.9,.25,1.1), opacity .3s ease;
+  }
+  #kb.open { transform: translate(-50%, 0); opacity: 1; pointer-events: auto; }
+  .kb-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .pill {
+    font-size: 15px; padding: 9px 20px; border-radius: 999px;
+    letter-spacing: .05em; cursor: pointer; transition: transform .1s;
+  }
+  .pill.down { transform: scale(.93); }
+  .kb-cancel { color: #ff3b4a; background: rgba(255,59,74,.12); box-shadow: inset 0 0 0 .5px rgba(255,59,74,.55); }
+  .kb-enter {
+    color: #00211e; font-weight: 300; background: #2ee6d2;
+    box-shadow: 0 0 22px rgba(46,230,210,.45), inset 0 1px 0 rgba(255,255,255,.65);
+  }
+  .kb-body { display: flex; gap: 12px; }
+  .kb-keys { flex: 1; display: flex; flex-direction: column; gap: 7px; }
+  .kb-row { display: flex; gap: 6px; justify-content: center; }
+  .k {
+    flex: 1 1 0; max-width: 66px; height: 46px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 13px; font-size: 19px; font-weight: 200; color: #fff;
+    background: rgba(255,255,255,.07);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.13), inset 0 0 0 .5px rgba(255,255,255,.1);
+    transition: transform .08s ease, background .12s ease, color .12s;
+    cursor: pointer;
+  }
+  .k.down { transform: scale(.9); background: rgba(255,255,255,.24); }
+  .k.wide { max-width: 100px; flex-grow: 1.5; }
+  .k.space { max-width: none; flex-grow: 5; font-size: 14px; letter-spacing: .08em; color: rgba(255,255,255,.6); }
+  .k.on { background: rgba(255,111,181,.25); color: #ff6fb5; }
+  .kb-emo {
+    width: 176px; padding-left: 12px; max-height: 266px; overflow-y: auto;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 6px; align-content: start;
+    border-left: .5px solid rgba(255,255,255,.12);
+  }
+  .kb-emo .k { max-width: none; height: 40px; font-size: 15px; }
+  #kb.open .k, #kb.open .pill { animation: kin .38s cubic-bezier(.2,.9,.3,1.15) backwards; animation-delay: calc(var(--i, 0) * 7ms + 80ms); }
+  @keyframes kin { from { opacity: 0; transform: translateY(10px) scale(.94); } }
 </style>
 </head>
 <body>
 <div id="list"></div>
 <input id="pick" type="file" accept="video/*" multiple>
+<div id="kb" aria-hidden="true"></div>
 
 <script>
 /* Videos sitting next to this file (used when opened from the folder on a Mac). */
@@ -118,16 +186,35 @@ function render() {
     const txt = document.createElement('span'); txt.className = 'txt'; txt.textContent = it.title;
     const ln = document.createElement('span'); ln.className = 'ln';
     d.append(txt, ln);
-    d.onclick = e => openWin(it, e.clientX, e.clientY);
     it.row = d; it.txt = txt;
+
+    // tap = open, tap-and-hold = rename
+    let hold = null, hx = 0, hy = 0;
+    d.addEventListener('pointerdown', e => {
+      it.skipClick = false;
+      if (editing) return;
+      hx = e.clientX; hy = e.clientY;
+      hold = setTimeout(() => { hold = null; it.skipClick = true; startEdit(it); }, 480);
+    });
+    d.addEventListener('pointermove', e => {
+      if (hold && Math.hypot(e.clientX - hx, e.clientY - hy) > 10) { clearTimeout(hold); hold = null; }
+    });
+    ['pointerup', 'pointercancel'].forEach(t => d.addEventListener(t, () => { if (hold) { clearTimeout(hold); hold = null; } }));
+    d.addEventListener('contextmenu', e => e.preventDefault());
+    d.onclick = e => {
+      if (it.skipClick) { it.skipClick = false; return; }
+      if (editing) return;
+      openWin(it, e.clientX, e.clientY);
+    };
     list.append(d);
   }
+  syncRows();
 }
 
 /* Long-press on empty space = add more videos */
 let lp = null, lpX = 0, lpY = 0;
 list.addEventListener('pointerdown', e => {
-  if (e.target.closest('.t')) return;
+  if (e.target.closest('.t') || editing) return;
   lpX = e.clientX; lpY = e.clientY;
   lp = setTimeout(() => { lp = null; picker.click(); }, 650);
 });
@@ -141,7 +228,7 @@ const cancelLp = e => {
 /* ================= duplicates ================= */
 function isDuplicate(name, size, mod) {
   return items.some(i =>
-    i.title === name ||
+    i.name === name ||
     (size && i.size === size && mod && i.mod === mod));
 }
 
@@ -183,7 +270,7 @@ picker.addEventListener('change', async () => {
   const fresh = [];
   for (const f of files) {
     if (isDuplicate(f.name, f.size, f.lastModified)) continue;
-    items.push({ title: f.name, src: URL.createObjectURL(f), size: f.size, mod: f.lastModified });
+    items.push({ name: f.name, title: titleFor(f.name), src: URL.createObjectURL(f), size: f.size, mod: f.lastModified });
     fresh.push(f);
   }
   if (!fresh.length) return;
@@ -525,11 +612,208 @@ list.addEventListener('touchend', e => {
   }
 });
 document.addEventListener('keydown', e => {
+  if (editing) return;
   if ((e.key === 'f' || e.key === 'F') && !e.metaKey && !e.ctrlKey) toggleFullscreen();
 });
 
+/* ================= rainbow collapse lines ================= */
+// Collapsed lines are coloured in order, one hue each; 12 lines make the full spectrum, then it loops.
+let paintQueued = false;
+function paintLines() {
+  paintQueued = false;
+  let n = 0;
+  for (const row of list.children) {
+    const ln = row.querySelector('.ln');
+    if (!ln) continue;
+    if (row.classList.contains('collapsed')) {
+      ln.style.setProperty('--c', `hsl(${(n % 12) * 30}, 100%, 62%)`);
+      n++;
+    } else ln.style.removeProperty('--c');
+  }
+}
+new MutationObserver(() => {
+  if (!paintQueued) { paintQueued = true; requestAnimationFrame(paintLines); }
+}).observe(list, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
+
+/* ================= titles: tap-and-hold to rename ================= */
+const TITLE_KEY = 'phantas-titles';
+let savedTitles = {};
+try { savedTitles = JSON.parse(localStorage.getItem(TITLE_KEY) || '{}') || {}; } catch (err) {}
+function saveTitle(name, title) {
+  savedTitles[name] = title;
+  try { localStorage.setItem(TITLE_KEY, JSON.stringify(savedTitles)); } catch (err) {}
+}
+function splitExt(name) {
+  const i = name.lastIndexOf('.');
+  return i > 0 ? [name.slice(0, i), name.slice(i)] : [name, ''];
+}
+function titleFor(name) { return savedTitles[name] || name; }
+
+const mk = (cls, text) => { const e = document.createElement('span'); e.className = cls; if (text != null) e.textContent = text; return e; };
+
+function rowState(it) {
+  const o = wins.find(w => w.it === it);
+  if (!o) return 'idle';
+  return activeWin === o ? 'active' : 'collapsed';
+}
+// Rebuild a row's normal contents and put it in the right state with no animation.
+function restoreRow(it, blank) {
+  if (!it.row) return;
+  it.anim = (it.anim || 0) + 1;
+  const st = rowState(it);
+  it.row.className = 't';
+  it.row.innerHTML = '';
+  it.txt = mk('txt', (st === 'collapsed' || blank) ? '' : it.title);
+  it.row.append(it.txt, mk('ln'));
+  if (st === 'collapsed') it.row.classList.add('collapsed');
+  if (st === 'active') it.row.classList.add('active');
+  return st;
+}
+function syncRows() { for (const it of items) if (it.row && (!editing || editing.it !== it)) restoreRow(it); }
+
+let editing = null;   // { it, buf, ext, txt, shift, cutting }
+
+function startEdit(it) {
+  if (editing) return;
+  it.anim = (it.anim || 0) + 1;
+  const ext = splitExt(it.name)[1];
+  const base = it.title.endsWith(ext) ? it.title.slice(0, it.title.length - ext.length) : it.title;
+  const txt = mk('etxt', base);
+  it.row.className = 't editing';
+  it.row.innerHTML = '';
+  it.row.append(txt, mk('caret'), mk('eext', ext));
+  editing = { it, buf: '', ext, txt, shift: false, cutting: true };
+  if (navigator.vibrate) try { navigator.vibrate(8); } catch (err) {}
+
+  // cut the old title away, right to left
+  let cur = [...base];
+  const step = Math.max(8, Math.min(30, 320 / (cur.length || 1)));
+  const tick = () => {
+    if (!editing || editing.it !== it || !editing.cutting) return;
+    if (!cur.length) { editing.cutting = false; return; }
+    cur.pop(); txt.textContent = cur.join('');
+    setTimeout(tick, step);
+  };
+  setTimeout(tick, 90);
+
+  openKb();
+  const r = it.row.getBoundingClientRect();
+  window.scrollBy({ top: r.top - innerHeight * 0.26, behavior: 'smooth' });
+}
+
+function typeKey(k) {
+  if (!editing) return;
+  editing.cutting = false;
+  if (k === '⌫') editing.buf = [...editing.buf].slice(0, -1).join('');
+  else if (k === '⇧') { editing.shift = !editing.shift; updateShift(); return; }
+  else if (k === 'space') editing.buf += ' ';
+  else {
+    let ch = k;
+    if (editing.shift && ch.length === 1) { ch = ch.toUpperCase(); editing.shift = false; updateShift(); }
+    editing.buf += ch;
+  }
+  editing.txt.textContent = editing.buf;
+}
+
+function finishEdit(save) {
+  if (!editing) return;
+  const { it, buf, ext } = editing;
+  editing = null;
+  closeKb();
+  const base = buf.trim();
+  const ok = save && base.length > 0;
+  if (ok) { it.title = base + ext; saveTitle(it.name, it.title); }
+  const st = restoreRow(it, true);
+  it.row.classList.add(ok ? 'saved' : 'canceled');
+  setTimeout(() => it.row && it.row.classList.remove('saved', 'canceled'), 650);
+  if (st !== 'collapsed') typeTo(it, true);
+}
+
+/* ---- the keyboard ---- */
+const kb = document.getElementById('kb');
+const KB_ROWS = [
+  ['1','2','3','4','5','6','7','8','9','0'],
+  ['q','w','e','r','t','y','u','i','o','p'],
+  ['a','s','d','f','g','h','j','k','l'],
+  ['⇧','z','x','c','v','b','n','m','⌫'],
+  ['-','_','space','.',"'"]
+];
+const EMOTES = [':)', ':(', ';)', ':D', ':P', ':/', '<3', '</3', 'xD', ':3',
+                '^_^', '-_-', 'T_T', 'o_O', '>_<', ':^)', '(:', '):', '._.', '\\o/'];
+
+function pressable(el, fn, repeat) {
+  let rep = null, delay = null;
+  const stop = () => { el.classList.remove('down'); clearTimeout(delay); clearInterval(rep); };
+  el.addEventListener('pointerdown', e => {
+    e.preventDefault(); e.stopPropagation();
+    el.classList.add('down'); fn();
+    if (repeat) delay = setTimeout(() => { rep = setInterval(fn, 55); }, 380);
+  });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => el.addEventListener(t, stop));
+}
+
+function buildKb() {
+  let i = 0;
+  const top = document.createElement('div'); top.className = 'kb-top';
+  const cancel = mk('pill kb-cancel', 'cancel'); cancel.style.setProperty('--i', 0);
+  const enter = mk('pill kb-enter', 'enter'); enter.style.setProperty('--i', 0);
+  pressable(cancel, () => finishEdit(false));
+  pressable(enter, () => finishEdit(true));
+  top.append(cancel, enter);
+
+  const body = document.createElement('div'); body.className = 'kb-body';
+  const keys = document.createElement('div'); keys.className = 'kb-keys';
+  for (const row of KB_ROWS) {
+    const r = document.createElement('div'); r.className = 'kb-row';
+    for (const k of row) {
+      const el = mk('k', k === 'space' ? 'space' : k);
+      el.dataset.k = k;
+      if (k === '⇧' || k === '⌫') el.classList.add('wide');
+      if (k === 'space') el.classList.add('space');
+      el.style.setProperty('--i', i++);
+      pressable(el, () => typeKey(k), k === '⌫');
+      r.append(el);
+    }
+    keys.append(r);
+  }
+  const emo = document.createElement('div'); emo.className = 'kb-emo';
+  for (const e of EMOTES) {
+    const el = mk('k', e);
+    el.style.setProperty('--i', i++);
+    pressable(el, () => typeKey(e));
+    emo.append(el);
+  }
+  body.append(keys, emo);
+  kb.append(top, body);
+}
+function updateShift() {
+  const on = editing && editing.shift;
+  kb.querySelectorAll('.k[data-k]').forEach(el => {
+    const k = el.dataset.k;
+    if (k === '⇧') el.classList.toggle('on', !!on);
+    else if (k.length === 1 && /[a-z]/.test(k)) el.textContent = on ? k.toUpperCase() : k;
+  });
+}
+function openKb() { updateShift(); kb.classList.add('open'); kb.setAttribute('aria-hidden', 'false'); }
+function closeKb() { kb.classList.remove('open'); kb.setAttribute('aria-hidden', 'true'); }
+kb.addEventListener('pointerdown', e => e.stopPropagation());
+buildKb();
+
+// Hardware keyboard while renaming
+document.addEventListener('keydown', e => {
+  if (!editing) return;
+  if (e.metaKey || e.ctrlKey) return;
+  e.preventDefault(); e.stopPropagation();
+  if (e.key === 'Enter') finishEdit(true);
+  else if (e.key === 'Escape') finishEdit(false);
+  else if (e.key === 'Backspace') typeKey('⌫');
+  else if (e.key === ' ') typeKey('space');
+  else if (e.key.length === 1) { editing.cutting = false; editing.buf += e.key; editing.txt.textContent = editing.buf; }
+}, true);
+
 /* ================= spacebar = reset everything ================= */
 document.addEventListener('keydown', e => {
+  if (editing) return;
   if (e.code !== 'Space' && e.key !== ' ') return;
   e.preventDefault();
   [...wins].forEach(o => { o.closed = true; o.v.pause(); o.v.removeAttribute('src'); o.v.load(); o.el.remove(); });
@@ -547,12 +831,12 @@ document.addEventListener('keydown', e => {
   if (stored.length) {
     for (const s of stored) {
       if (isDuplicate(s.name, s.size, s.mod)) continue;
-      items.push({ title: s.name, src: URL.createObjectURL(s.blob), size: s.size, mod: s.mod });
+      items.push({ name: s.name, title: titleFor(s.name), src: URL.createObjectURL(s.blob), size: s.size, mod: s.mod });
     }
   } else {
     const found = await Promise.all(MANIFEST.map(async n => {
       const src = encodeURI(n);
-      return (await probe(src)) ? { title: n, src } : null;
+      return (await probe(src)) ? { name: n, title: titleFor(n), src } : null;
     }));
     items = found.filter(Boolean);
   }

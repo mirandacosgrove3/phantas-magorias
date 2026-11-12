@@ -8,6 +8,8 @@ Minimal video-title player for iPad. Thin white text on black; tap a title to op
 - **Duplicates:** the same file can't be loaded twice; tapping an already-open title brings its window forward.
 - **Sound on iPad:** iOS allows one video with sound at a time — all windows keep playing (no pausing), tap a window to give it the sound.
 - **Titles:** the topmost window's title glows pink; when another window takes focus it reverse-types into a short line, and types back out when its window closes.
+- **Rename:** tap-and-hold a title — it cuts itself away, a pink caret blinks, and a glass keyboard slides up (emoticons on the right, red cancel, turquoise enter). The file type always stays. Titles are saved on the device.
+- **Collapsed lines:** rainbow, one hue per line, a full spectrum every 12 lines, then it loops.
 - **Fullscreen:** two-finger tap on empty space, or press F.
 - **Spacebar:** closes everything and scrolls to top.
 - **Local mode:** drop `index.html` in a folder with the videos listed in `MANIFEST` and they load automatically.
