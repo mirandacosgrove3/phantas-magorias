@@ -835,6 +835,30 @@ function resetAll() {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+/* ================= self-update ================= */
+// Bump BUILD whenever the page changes. On launch / when the app comes back to the
+// foreground it checks the live copy (skipping every cache) and reloads if it's newer.
+const BUILD = '2026-11-12-235431';
+async function checkForUpdate() {
+  try {
+    if (!/^https?:/.test(location.protocol)) return;
+    const url = location.href.split('#')[0].split('?')[0];
+    const res = await fetch(url + '?check=' + Date.now(), { cache: 'no-store' });
+    if (!res.ok) return;
+    const m = (await res.text()).match(/const BUILD = '2026-11-12-235431']+)'/);
+    if (!m || m[1] === BUILD) return;
+    const go = () => location.replace(url + '?v=' + encodeURIComponent(m[1]));
+    if (!wins.length && !editing) go();
+    else {
+      // wait until nothing is open so nothing gets cut off mid-play
+      const wait = setInterval(() => { if (!wins.length && !editing) { clearInterval(wait); go(); } }, 2000);
+    }
+  } catch (err) {}
+}
+checkForUpdate();
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkForUpdate(); });
+addEventListener('pageshow', e => { if (e.persisted) checkForUpdate(); });
+
 /* ================= boot ================= */
 (async () => {
   const stored = await loadStored();

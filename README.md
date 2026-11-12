@@ -15,3 +15,5 @@ Minimal video-title player for iPad. Thin white text on black; tap a title to op
 - **Local mode:** drop `index.html` in a folder with the videos listed in `MANIFEST` and they load automatically.
 
 Edit `index.html` on github.com (press `.` for the editor); Pages redeploys on each commit.
+
+**After editing by hand, change the `BUILD` stamp in index.html** (any new value). The installed iPad app compares it against the live copy on launch and reloads itself when it differs.
