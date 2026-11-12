@@ -33,6 +33,14 @@
     transition: opacity .15s;
   }
   .t:active { opacity: .3; }
+  .t .txt { transition: color .2s; }
+  .t.active .txt { color: #ff6fb5; }
+  .t .ln {
+    display: inline-block; vertical-align: middle;
+    width: 0; height: 1px; background: #fff;
+    transition: width .2s ease;
+  }
+  .t.collapsed .ln { width: 1.6em; }
 
   .win {
     position: fixed;
@@ -107,8 +115,11 @@ function render() {
   for (const it of items) {
     const d = document.createElement('div');
     d.className = 't';
-    d.textContent = it.title;
+    const txt = document.createElement('span'); txt.className = 'txt'; txt.textContent = it.title;
+    const ln = document.createElement('span'); ln.className = 'ln';
+    d.append(txt, ln);
     d.onclick = e => openWin(it, e.clientX, e.clientY);
+    it.row = d; it.txt = txt;
     list.append(d);
   }
 }
@@ -195,7 +206,12 @@ function probe(src) {
 
 /* ================= layout ================= */
 const view = () => ({ W: innerWidth, H: innerHeight });
-const baseWidth = () => Math.min(innerWidth * 0.46, 620);
+/* Largest a window opens at: about 1/5 of the screen's area. */
+const capWidth = aspect => {
+  const { W, H } = view();
+  let w = Math.sqrt(W * H * 0.2 * aspect);
+  return Math.min(w, W - 2 * PAD, (H - 2 * PAD) * aspect);
+};
 
 function apply(o, animate) {
   o.el.classList.toggle('anim', !!animate);
@@ -223,7 +239,7 @@ function tile() {
       const col = i % c, row = Math.floor(i / c);
       const inRow = Math.min(c, n - row * c);                 // center a short last row
       const rowOffset = (c - inRow) * (cw + PAD) / 2;
-      const w = Math.min(cw, ch * o.aspect, W * 0.62);
+      const w = Math.min(cw, ch * o.aspect, capWidth(o.aspect));
       const h = w / o.aspect;
       area += w * h;
       return {
@@ -250,10 +266,8 @@ function placeFree(o, ax, ay, animate) {
   }, 0);
 
   let fallback = null;
-  for (const s of [1, 0.8, 0.64, 0.5, 0.38, 0.28]) {
-    let w = Math.max(140, baseWidth() * s), h = w / o.aspect;
-    const maxH = H * 0.72 * s + 60;
-    if (h > maxH) { h = maxH; w = h * o.aspect; }
+  for (const s of [1, 0.8, 0.64, 0.5, 0.38]) {
+    const w = Math.max(120, capWidth(o.aspect) * s), h = w / o.aspect;
     if (w > W - 2 * PAD || h > H - 2 * PAD) continue;
     let bestHere = null;
     const step = 20;
@@ -288,18 +302,55 @@ function giveSound(o) {
   o.v.muted = false;
 }
 
+/* ================= title animation ================= */
+// Reverse-types a title down into a short line, or types it back out.
+function typeTo(it, full) {
+  if (!it.txt) return;
+  const target = full ? it.title : '';
+  const token = (it.anim = (it.anim || 0) + 1);
+  if (full) it.row.classList.remove('collapsed');
+  const total = it.title.length || 1;
+  const stepMs = Math.max(6, Math.min(28, 380 / total));
+  const tick = () => {
+    if (it.anim !== token) return;
+    const cur = it.txt.textContent;
+    if (cur === target) {
+      if (!full) it.row.classList.add('collapsed');
+      return;
+    }
+    it.txt.textContent = full ? it.title.slice(0, cur.length + 1) : cur.slice(0, -1);
+    setTimeout(tick, stepMs);
+  };
+  tick();
+}
+function setRow(it, state) {          // 'idle' | 'active' | 'collapsed'
+  if (!it.row) return;
+  it.row.classList.toggle('active', state === 'active');
+  typeTo(it, state !== 'collapsed');
+}
+
+let activeWin = null;
+function setActive(o) {
+  if (activeWin === o) return;
+  if (activeWin && !activeWin.closed) setRow(activeWin.it, 'collapsed');
+  activeWin = o;
+  if (o) setRow(o.it, 'active');
+}
+
 /* ================= windows ================= */
-function front(o) { o.el.style.zIndex = ++z; }
+function front(o) { o.el.style.zIndex = ++z; o.z = z; setActive(o); }
 
 function closeWin(o) {
   o.closed = true;
   o.v.pause(); o.v.removeAttribute('src'); o.v.load();
   o.el.remove();
   wins.splice(wins.indexOf(o), 1);
+  setRow(o.it, 'idle');
+  const top = wins.reduce((a, b) => (!a || b.z > a.z ? b : a), null);
+  if (activeWin === o) { activeWin = null; if (top) setActive(top); }
   if (audible === o) {
     audible = null;
-    const next = wins[wins.length - 1];
-    if (next && IOS) giveSound(next);
+    if (top && IOS) giveSound(top);
   }
   if (!anyAdjusted()) tile();
 }
@@ -312,7 +363,7 @@ function openWin(it, x, y) {
     existing.el.classList.add('flash');
     setTimeout(() => existing.el.classList.remove('flash'), 350);
     if (IOS) giveSound(existing);
-    if (existing.v.paused) { existing.userPaused = false; existing.v.play().catch(() => {}); }
+    if (existing.v.paused) existing.v.play().catch(() => {});
     return;
   }
 
@@ -329,8 +380,9 @@ function openWin(it, x, y) {
   el.append(v, xb, rs);
   document.body.append(el);
 
-  const o = { it, el, v, aspect: 16 / 9, w: baseWidth(), h: baseWidth() * 9 / 16,
-              left: x, top: y, adjusted: false, userPaused: false, closed: false };
+  const w0 = capWidth(16 / 9);
+  const o = { it, el, v, aspect: 16 / 9, w: w0, h: w0 * 9 / 16,
+              left: x, top: y, adjusted: false, closed: false };
   o.left = x - o.w / 2; o.top = y - o.h / 2;
   wins.push(o);
   front(o);
@@ -345,11 +397,11 @@ function openWin(it, x, y) {
     else relayout(o);
   });
 
-  // If the system pauses a window we didn't pause (iOS audio rule), keep it running muted.
+  // Nothing ever stays paused: if the system pauses a window (iOS audio rule), restart it muted.
   v.addEventListener('pause', () => {
-    if (o.userPaused || o.closed) return;
+    if (o.closed) return;
     setTimeout(() => {
-      if (o.userPaused || o.closed || !v.paused) return;
+      if (o.closed || !v.paused) return;
       if (audible !== o) v.muted = true;
       v.play().catch(() => {});
     }, 60);
@@ -440,15 +492,10 @@ function openWin(it, x, y) {
   el.addEventListener('pointercancel', end);
 
   function onTap() {
-    // On iPad: first tap on a silent window gives it the sound; tap again to pause/play.
-    if (IOS && audible !== o) {
-      giveSound(o);
-      if (v.paused) { o.userPaused = false; v.play().catch(() => {}); }
-      return;
-    }
-    if (v.muted) v.muted = false;
-    if (v.paused) { o.userPaused = false; v.play().catch(() => {}); }
-    else { o.userPaused = true; v.pause(); }
+    // No pausing. On iPad a tap moves the sound to this window.
+    if (IOS) giveSound(o);
+    else if (v.muted) v.muted = false;
+    if (v.paused) v.play().catch(() => {});
   }
 }
 
@@ -488,6 +535,8 @@ document.addEventListener('keydown', e => {
   [...wins].forEach(o => { o.closed = true; o.v.pause(); o.v.removeAttribute('src'); o.v.load(); o.el.remove(); });
   wins.length = 0;
   audible = null;
+  activeWin = null;
+  for (const it of items) if (it.row) { it.anim = (it.anim || 0) + 1; it.row.classList.remove('active', 'collapsed'); it.txt.textContent = it.title; }
   z = 10;
   window.scrollTo(0, 0);
 });
