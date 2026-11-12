@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="PHANTAS MAGORIAS">
+<title>PHANTAS MAGORIAS</title>
+<style>
+  html, body { margin: 0; background: #000; color: #fff; }
+  body {
+    overflow-x: hidden;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-weight: 100;
+    -webkit-font-smoothing: antialiased;
+    -webkit-user-select: none; user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+    min-height: 100vh;
+  }
+  #list {
+    padding: calc(14vh + env(safe-area-inset-top)) 0 45vh calc(4vw + env(safe-area-inset-left));
+    min-height: 100vh; box-sizing: border-box;
+  }
+  .t {
+    font-size: clamp(10px, 1.75vw, 24px);
+    line-height: 1.5;
+    white-space: nowrap;
+    letter-spacing: 0.01em;
+    cursor: pointer;
+    transition: opacity .15s;
+  }
+  .t:active { opacity: .3; }
+
+  .win {
+    position: fixed;
+    background: #000;
+    touch-action: none;
+    box-shadow: 0 0 0 .5px rgba(255,255,255,.35);
+  }
+  .win video {
+    width: 100%; height: 100%; display: block;
+    object-fit: contain; background: #000;
+    pointer-events: none;
+  }
+  .x, .rs { position: absolute; width: 40px; height: 40px; touch-action: none; }
+  .x { top: 0; right: 0; }
+  .x::before, .x::after {
+    content: ""; position: absolute; left: 13px; top: 19.5px;
+    width: 14px; height: 1px; background: rgba(255,255,255,.8);
+  }
+  .x::before { transform: rotate(45deg); }
+  .x::after  { transform: rotate(-45deg); }
+  .rs { right: 0; bottom: 0; }
+  .rs::after {
+    content: ""; position: absolute; right: 7px; bottom: 7px;
+    width: 12px; height: 12px;
+    border-right: 1px solid rgba(255,255,255,.8);
+    border-bottom: 1px solid rgba(255,255,255,.8);
+  }
+  #pick { display: none; }
+</style>
+</head>
+<body>
+<div id="list"></div>
+<input id="pick" type="file" accept="video/*" multiple>
+
+<script>
+/* Videos sitting next to this file (used when opened from the folder on a Mac). */
+const MANIFEST = [
+  "00125.mov",
+  "00132.mov",
+  "RPReplay_Final1698920393.mp4",
+  "Screen Recording 2024-10-24 at 11.44.12 PM.mov",
+  "v12044gd0000clmh43fog65tcoasrtfg.mov",
+  "v14044g50000ck4d5erc77ubgiflmbcg.mov",
+  "v15044gf0000d3vqcm7og65kbiqd0stg.MP4"
+];
+
+const list = document.getElementById('list');
+const picker = document.getElementById('pick');
+let items = [];          // { title, src }
+let z = 10;
+
+const titleOf = name => name;
+
+/* ---------- list ---------- */
+function render() {
+  list.innerHTML = '';
+  if (!items.length) {
+    const d = document.createElement('div');
+    d.className = 't';
+    d.textContent = 'tap to load videos';
+    d.onclick = () => picker.click();
+    list.append(d);
+    return;
+  }
+  for (const it of items) {
+    const d = document.createElement('div');
+    d.className = 't';
+    d.textContent = it.title;
+    d.onclick = e => openWin(it, e.clientX, e.clientY);
+    list.append(d);
+  }
+}
+
+/* Long-press on empty space = add more videos */
+let lp = null, lpX = 0, lpY = 0;
+list.addEventListener('pointerdown', e => {
+  if (e.target.closest('.t')) return;
+  lpX = e.clientX; lpY = e.clientY;
+  lp = setTimeout(() => { lp = null; picker.click(); }, 650);
+});
+const cancelLp = e => {
+  if (!lp) return;
+  if (e.type === 'pointermove' && Math.hypot(e.clientX - lpX, e.clientY - lpY) < 10) return;
+  clearTimeout(lp); lp = null;
+};
+['pointerup', 'pointercancel', 'pointermove'].forEach(t => list.addEventListener(t, cancelLp));
+
+/* ---------- storage (keeps picked videos between visits) ---------- */
+function idb() {
+  return new Promise((res, rej) => {
+    try {
+      const r = indexedDB.open('phantas', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('videos', { keyPath: 'name' });
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    } catch (err) { rej(err); }
+  });
+}
+async function saveFiles(files) {
+  try {
+    const db = await idb();
+    await new Promise((res, rej) => {
+      const tx = db.transaction('videos', 'readwrite');
+      for (const f of files) tx.objectStore('videos').put({ name: f.name, blob: f, added: Date.now() });
+      tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+    });
+  } catch (err) { console.warn('could not store videos', err); }
+}
+async function loadStored() {
+  try {
+    const db = await idb();
+    return await new Promise((res, rej) => {
+      const r = db.transaction('videos').objectStore('videos').getAll();
+      r.onsuccess = () => res(r.result.sort((a, b) => a.added - b.added));
+      r.onerror = () => rej(r.error);
+    });
+  } catch (err) { return []; }
+}
+
+picker.addEventListener('change', async () => {
+  const files = [...picker.files];
+  picker.value = '';
+  if (!files.length) return;
+  const known = new Set(items.map(i => i.title));
+  for (const f of files) {
+    if (known.has(titleOf(f.name))) continue;
+    items.push({ title: titleOf(f.name), src: URL.createObjectURL(f) });
+  }
+  render();
+  saveFiles(files);
+});
+
+/* Check whether a video next to this page is reachable */
+function probe(src) {
+  return new Promise(res => {
+    const v = document.createElement('video');
+    v.preload = 'metadata'; v.muted = true;
+    const done = ok => { clearTimeout(t); v.removeAttribute('src'); v.load(); res(ok); };
+    const t = setTimeout(() => done(false), 4000);
+    v.onloadedmetadata = () => done(true);
+    v.onerror = () => done(false);
+    v.src = src;
+  });
+}
+
+/* ---------- floating player ---------- */
+function openWin(it, x, y) {
+  const win = document.createElement('div');
+  win.className = 'win';
+  win.style.zIndex = ++z;
+
+  const v = document.createElement('video');
+  v.src = it.src;
+  v.playsInline = true;
+  v.setAttribute('playsinline', '');
+  v.loop = true;
+  v.preload = 'auto';
+
+  const x_ = document.createElement('div'); x_.className = 'x';
+  const rs = document.createElement('div'); rs.className = 'rs';
+  win.append(v, x_, rs);
+  document.body.append(win);
+
+  let aspect = 16 / 9;
+  let w = Math.min(innerWidth * 0.46, 620), h = w / aspect;
+  let left, top;
+  const place = () => {
+    win.style.width = w + 'px'; win.style.height = h + 'px';
+    win.style.left = left + 'px'; win.style.top = top + 'px';
+  };
+  const clampPos = () => {
+    left = Math.min(Math.max(left, -w + 60), innerWidth - 60);
+    top  = Math.min(Math.max(top, 0), innerHeight - 60);
+  };
+  left = x - w / 2; top = y - h / 2; clampPos(); place();
+
+  v.addEventListener('loadedmetadata', () => {
+    if (!v.videoWidth) return;
+    aspect = v.videoWidth / v.videoHeight;
+    const cx = left + w / 2, cy = top + h / 2;
+    h = w / aspect;
+    const maxH = innerHeight * 0.72;
+    if (h > maxH) { h = maxH; w = h * aspect; }
+    left = cx - w / 2; top = cy - h / 2; clampPos(); place();
+  });
+
+  // Play immediately (the tap counts as permission for sound on iPad)
+  v.play().catch(() => { v.muted = true; v.play().catch(() => {}); });
+
+  const front = () => { win.style.zIndex = ++z; };
+
+  // close
+  x_.addEventListener('pointerdown', e => e.stopPropagation());
+  x_.addEventListener('click', e => {
+    e.stopPropagation();
+    v.pause(); v.removeAttribute('src'); v.load(); win.remove();
+  });
+
+  // corner resize
+  rs.addEventListener('pointerdown', e => {
+    e.stopPropagation(); front();
+    rs.setPointerCapture(e.pointerId);
+    const sx = e.clientX, sy = e.clientY, sw = w;
+    const move = ev => {
+      const dx = ev.clientX - sx, dy = (ev.clientY - sy) * aspect;
+      w = Math.max(140, sw + Math.max(dx, dy));
+      h = w / aspect; place();
+    };
+    const up = () => { rs.removeEventListener('pointermove', move); rs.removeEventListener('pointerup', up); rs.removeEventListener('pointercancel', up); };
+    rs.addEventListener('pointermove', move);
+    rs.addEventListener('pointerup', up);
+    rs.addEventListener('pointercancel', up);
+  });
+
+  // drag (1 finger), pinch-resize (2 fingers), tap = pause/play
+  const pts = new Map();
+  let start = null;
+  const snapshot = () => {
+    const p = [...pts.values()];
+    start = {
+      left, top, w,
+      t: performance.now(),
+      moved: false,
+      p0: { ...p[0] },
+      dist: p.length > 1 ? Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) : 0,
+      mid: p.length > 1 ? { x: (p[0].x + p[1].x) / 2, y: (p[0].y + p[1].y) / 2 } : null,
+      n: p.length
+    };
+  };
+  win.addEventListener('pointerdown', e => {
+    front();
+    win.setPointerCapture(e.pointerId);
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const wasMoved = start && start.moved;
+    snapshot();
+    if (wasMoved || pts.size > 1) start.moved = true;
+  });
+  win.addEventListener('pointermove', e => {
+    if (!pts.has(e.pointerId)) return;
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const p = [...pts.values()];
+    if (start.n >= 2 && p.length >= 2) {
+      const d = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
+      const mid = { x: (p[0].x + p[1].x) / 2, y: (p[0].y + p[1].y) / 2 };
+      const nw = Math.min(Math.max(start.w * d / start.dist, 140), innerWidth * 1.6);
+      const cx = start.left + start.w / 2 + (mid.x - start.mid.x);
+      const cy = start.top + start.w / aspect / 2 + (mid.y - start.mid.y);
+      w = nw; h = w / aspect; left = cx - w / 2; top = cy - h / 2;
+      start.moved = true; place();
+    } else if (p.length === 1) {
+      const dx = p[0].x - start.p0.x, dy = p[0].y - start.p0.y;
+      if (!start.moved && Math.hypot(dx, dy) < 8) return;
+      start.moved = true;
+      left = start.left + dx; top = start.top + dy; clampPos(); place();
+    }
+  });
+  const end = e => {
+    if (!pts.has(e.pointerId)) return;
+    pts.delete(e.pointerId);
+    if (pts.size === 0) {
+      if (!start.moved && performance.now() - start.t < 350 && e.type === 'pointerup') {
+        if (v.muted) v.muted = false;
+        v.paused ? v.play() : v.pause();
+      }
+      start = null;
+    } else {
+      snapshot(); start.moved = true;
+    }
+  };
+  win.addEventListener('pointerup', end);
+  win.addEventListener('pointercancel', end);
+}
+
+/* ---------- spacebar = reset everything ---------- */
+document.addEventListener('keydown', e => {
+  if (e.code !== 'Space' && e.key !== ' ') return;
+  e.preventDefault();
+  document.querySelectorAll('.win').forEach(w => {
+    const v = w.querySelector('video');
+    if (v) { v.pause(); v.removeAttribute('src'); v.load(); }
+    w.remove();
+  });
+  z = 10;
+  window.scrollTo(0, 0);
+});
+
+/* ---------- boot ---------- */
+(async () => {
+  const stored = await loadStored();
+  if (stored.length) {
+    items = stored.map(s => ({ title: titleOf(s.name), src: URL.createObjectURL(s.blob) }));
+  } else {
+    const found = await Promise.all(MANIFEST.map(async n => {
+      const src = encodeURI(n);
+      return (await probe(src)) ? { title: titleOf(n), src } : null;
+    }));
+    items = found.filter(Boolean);
+  }
+  render();
+})();
+render();
+</script>
+</body>
