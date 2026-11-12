@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="PHANTAS MAGORIAS">
 <title>PHANTAS MAGORIAS</title>
 <style>
@@ -40,6 +40,8 @@
     touch-action: none;
     box-shadow: 0 0 0 .5px rgba(255,255,255,.35);
   }
+  .win.anim { transition: left .28s ease, top .28s ease, width .28s ease, height .28s ease; }
+  .win.flash { box-shadow: 0 0 0 1.5px rgba(255,255,255,.9); }
   .win video {
     width: 100%; height: 100%; display: block;
     object-fit: contain; background: #000;
@@ -79,14 +81,19 @@ const MANIFEST = [
   "v15044gf0000d3vqcm7og65kbiqd0stg.MP4"
 ];
 
+/* iOS / iPadOS only lets one video play with sound at a time.
+   There, every window keeps playing muted and the sound follows the window you tap. */
+const IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+            (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
 const list = document.getElementById('list');
 const picker = document.getElementById('pick');
-let items = [];          // { title, src }
+let items = [];          // { title, src, size, mod }
+const wins = [];         // open windows
 let z = 10;
+const PAD = 14;
 
-const titleOf = name => name;
-
-/* ---------- list ---------- */
+/* ================= list ================= */
 function render() {
   list.innerHTML = '';
   if (!items.length) {
@@ -120,7 +127,14 @@ const cancelLp = e => {
 };
 ['pointerup', 'pointercancel', 'pointermove'].forEach(t => list.addEventListener(t, cancelLp));
 
-/* ---------- storage (keeps picked videos between visits) ---------- */
+/* ================= duplicates ================= */
+function isDuplicate(name, size, mod) {
+  return items.some(i =>
+    i.title === name ||
+    (size && i.size === size && mod && i.mod === mod));
+}
+
+/* ================= storage (keeps picked videos between visits) ================= */
 function idb() {
   return new Promise((res, rej) => {
     try {
@@ -136,7 +150,7 @@ async function saveFiles(files) {
     const db = await idb();
     await new Promise((res, rej) => {
       const tx = db.transaction('videos', 'readwrite');
-      for (const f of files) tx.objectStore('videos').put({ name: f.name, blob: f, added: Date.now() });
+      for (const f of files) tx.objectStore('videos').put({ name: f.name, blob: f, size: f.size, mod: f.lastModified, added: Date.now() });
       tx.oncomplete = res; tx.onerror = () => rej(tx.error);
     });
   } catch (err) { console.warn('could not store videos', err); }
@@ -155,14 +169,15 @@ async function loadStored() {
 picker.addEventListener('change', async () => {
   const files = [...picker.files];
   picker.value = '';
-  if (!files.length) return;
-  const known = new Set(items.map(i => i.title));
+  const fresh = [];
   for (const f of files) {
-    if (known.has(titleOf(f.name))) continue;
-    items.push({ title: titleOf(f.name), src: URL.createObjectURL(f) });
+    if (isDuplicate(f.name, f.size, f.lastModified)) continue;
+    items.push({ title: f.name, src: URL.createObjectURL(f), size: f.size, mod: f.lastModified });
+    fresh.push(f);
   }
+  if (!fresh.length) return;
   render();
-  saveFiles(files);
+  saveFiles(fresh);
 });
 
 /* Check whether a video next to this page is reachable */
@@ -178,68 +193,186 @@ function probe(src) {
   });
 }
 
-/* ---------- floating player ---------- */
-function openWin(it, x, y) {
-  const win = document.createElement('div');
-  win.className = 'win';
-  win.style.zIndex = ++z;
+/* ================= layout ================= */
+const view = () => ({ W: innerWidth, H: innerHeight });
+const baseWidth = () => Math.min(innerWidth * 0.46, 620);
 
+function apply(o, animate) {
+  o.el.classList.toggle('anim', !!animate);
+  o.el.style.width = o.w + 'px';
+  o.el.style.height = o.h + 'px';
+  o.el.style.left = o.left + 'px';
+  o.el.style.top = o.top + 'px';
+}
+
+const anyAdjusted = () => wins.some(o => o.adjusted);
+
+/* Nobody has moved/resized anything yet: tile every window into a tidy grid. */
+function tile() {
+  const n = wins.length;
+  if (!n) return;
+  const { W, H } = view();
+  let best = null;
+  for (let c = 1; c <= n; c++) {
+    const r = Math.ceil(n / c);
+    const cw = (W - PAD * (c + 1)) / c;
+    const ch = (H - PAD * (r + 1)) / r;
+    if (cw < 80 || ch < 60) continue;
+    let area = 0;
+    const cells = wins.map((o, i) => {
+      const col = i % c, row = Math.floor(i / c);
+      const inRow = Math.min(c, n - row * c);                 // center a short last row
+      const rowOffset = (c - inRow) * (cw + PAD) / 2;
+      const w = Math.min(cw, ch * o.aspect, W * 0.62);
+      const h = w / o.aspect;
+      area += w * h;
+      return {
+        w, h,
+        left: rowOffset + PAD + col * (cw + PAD) + (cw - w) / 2,
+        top: PAD + row * (ch + PAD) + (ch - h) / 2
+      };
+    });
+    if (!best || area > best.area * 1.02) best = { area, cells };
+  }
+  if (!best) return;
+  wins.forEach((o, i) => { Object.assign(o, best.cells[i]); apply(o, true); });
+}
+
+/* Someone has arranged things: leave every other window alone and
+   drop this one into the emptiest spot, shrinking it if needed. */
+function placeFree(o, ax, ay, animate) {
+  const { W, H } = view();
+  const others = wins.filter(p => p !== o);
+  const overlap = (l, t, w, h) => others.reduce((s, p) => {
+    const ox = Math.max(0, Math.min(l + w, p.left + p.w) - Math.max(l, p.left));
+    const oy = Math.max(0, Math.min(t + h, p.top + p.h) - Math.max(t, p.top));
+    return s + ox * oy;
+  }, 0);
+
+  let fallback = null;
+  for (const s of [1, 0.8, 0.64, 0.5, 0.38, 0.28]) {
+    let w = Math.max(140, baseWidth() * s), h = w / o.aspect;
+    const maxH = H * 0.72 * s + 60;
+    if (h > maxH) { h = maxH; w = h * o.aspect; }
+    if (w > W - 2 * PAD || h > H - 2 * PAD) continue;
+    let bestHere = null;
+    const step = 20;
+    for (let t = PAD; t <= H - h - PAD; t += step) {
+      for (let l = PAD; l <= W - w - PAD; l += step) {
+        const ov = overlap(l, t, w, h);
+        const dist = Math.hypot(l + w / 2 - ax, t + h / 2 - ay);
+        if (ov === 0 && (!bestHere || dist < bestHere.dist)) bestHere = { l, t, w, h, dist };
+        const score = ov / (w * h) * 1e6 + dist;
+        if (!fallback || score < fallback.score) fallback = { l, t, w, h, score };
+      }
+    }
+    if (bestHere) { Object.assign(o, { left: bestHere.l, top: bestHere.t, w: bestHere.w, h: bestHere.h }); apply(o, animate); return; }
+  }
+  if (fallback) Object.assign(o, { left: fallback.l, top: fallback.t, w: fallback.w, h: fallback.h });
+  apply(o, animate);
+}
+
+function relayout(o) {
+  if (!anyAdjusted()) tile();
+  else if (o && !o.adjusted) placeFree(o, o.left + o.w / 2, o.top + o.h / 2, true);
+}
+
+addEventListener('resize', () => { if (!anyAdjusted()) tile(); });
+
+/* ================= audio focus (iOS) ================= */
+let audible = null;
+function giveSound(o) {
+  audible = o;
+  if (!IOS) { o.v.muted = false; return; }
+  for (const p of wins) if (p !== o) p.v.muted = true;
+  o.v.muted = false;
+}
+
+/* ================= windows ================= */
+function front(o) { o.el.style.zIndex = ++z; }
+
+function closeWin(o) {
+  o.closed = true;
+  o.v.pause(); o.v.removeAttribute('src'); o.v.load();
+  o.el.remove();
+  wins.splice(wins.indexOf(o), 1);
+  if (audible === o) {
+    audible = null;
+    const next = wins[wins.length - 1];
+    if (next && IOS) giveSound(next);
+  }
+  if (!anyAdjusted()) tile();
+}
+
+function openWin(it, x, y) {
+  // Already open? Bring it forward instead of opening a duplicate.
+  const existing = wins.find(o => o.it === it);
+  if (existing) {
+    front(existing);
+    existing.el.classList.add('flash');
+    setTimeout(() => existing.el.classList.remove('flash'), 350);
+    if (IOS) giveSound(existing);
+    if (existing.v.paused) { existing.userPaused = false; existing.v.play().catch(() => {}); }
+    return;
+  }
+
+  const el = document.createElement('div');
+  el.className = 'win';
   const v = document.createElement('video');
   v.src = it.src;
   v.playsInline = true;
   v.setAttribute('playsinline', '');
   v.loop = true;
   v.preload = 'auto';
-
-  const x_ = document.createElement('div'); x_.className = 'x';
+  const xb = document.createElement('div'); xb.className = 'x';
   const rs = document.createElement('div'); rs.className = 'rs';
-  win.append(v, x_, rs);
-  document.body.append(win);
+  el.append(v, xb, rs);
+  document.body.append(el);
 
-  let aspect = 16 / 9;
-  let w = Math.min(innerWidth * 0.46, 620), h = w / aspect;
-  let left, top;
-  const place = () => {
-    win.style.width = w + 'px'; win.style.height = h + 'px';
-    win.style.left = left + 'px'; win.style.top = top + 'px';
-  };
-  const clampPos = () => {
-    left = Math.min(Math.max(left, -w + 60), innerWidth - 60);
-    top  = Math.min(Math.max(top, 0), innerHeight - 60);
-  };
-  left = x - w / 2; top = y - h / 2; clampPos(); place();
+  const o = { it, el, v, aspect: 16 / 9, w: baseWidth(), h: baseWidth() * 9 / 16,
+              left: x, top: y, adjusted: false, userPaused: false, closed: false };
+  o.left = x - o.w / 2; o.top = y - o.h / 2;
+  wins.push(o);
+  front(o);
+
+  if (anyAdjusted()) placeFree(o, x, y, false);
+  else tile();
 
   v.addEventListener('loadedmetadata', () => {
     if (!v.videoWidth) return;
-    aspect = v.videoWidth / v.videoHeight;
-    const cx = left + w / 2, cy = top + h / 2;
-    h = w / aspect;
-    const maxH = innerHeight * 0.72;
-    if (h > maxH) { h = maxH; w = h * aspect; }
-    left = cx - w / 2; top = cy - h / 2; clampPos(); place();
+    o.aspect = v.videoWidth / v.videoHeight;
+    if (o.adjusted) { o.h = o.w / o.aspect; apply(o, false); }
+    else relayout(o);
   });
 
-  // Play immediately (the tap counts as permission for sound on iPad)
+  // If the system pauses a window we didn't pause (iOS audio rule), keep it running muted.
+  v.addEventListener('pause', () => {
+    if (o.userPaused || o.closed) return;
+    setTimeout(() => {
+      if (o.userPaused || o.closed || !v.paused) return;
+      if (audible !== o) v.muted = true;
+      v.play().catch(() => {});
+    }, 60);
+  });
+
+  // Play immediately with sound (the tap counts as permission).
+  giveSound(o);
   v.play().catch(() => { v.muted = true; v.play().catch(() => {}); });
 
-  const front = () => { win.style.zIndex = ++z; };
+  /* close */
+  xb.addEventListener('pointerdown', e => e.stopPropagation());
+  xb.addEventListener('click', e => { e.stopPropagation(); closeWin(o); });
 
-  // close
-  x_.addEventListener('pointerdown', e => e.stopPropagation());
-  x_.addEventListener('click', e => {
-    e.stopPropagation();
-    v.pause(); v.removeAttribute('src'); v.load(); win.remove();
-  });
-
-  // corner resize
+  /* corner resize */
   rs.addEventListener('pointerdown', e => {
-    e.stopPropagation(); front();
+    e.stopPropagation(); front(o);
+    el.classList.remove('anim');
     rs.setPointerCapture(e.pointerId);
-    const sx = e.clientX, sy = e.clientY, sw = w;
+    const sx = e.clientX, sy = e.clientY, sw = o.w;
     const move = ev => {
-      const dx = ev.clientX - sx, dy = (ev.clientY - sy) * aspect;
-      w = Math.max(140, sw + Math.max(dx, dy));
-      h = w / aspect; place();
+      const dx = ev.clientX - sx, dy = (ev.clientY - sy) * o.aspect;
+      o.w = Math.max(140, sw + Math.max(dx, dy));
+      o.h = o.w / o.aspect; o.adjusted = true; apply(o, false);
     };
     const up = () => { rs.removeEventListener('pointermove', move); rs.removeEventListener('pointerup', up); rs.removeEventListener('pointercancel', up); };
     rs.addEventListener('pointermove', move);
@@ -247,30 +380,34 @@ function openWin(it, x, y) {
     rs.addEventListener('pointercancel', up);
   });
 
-  // drag (1 finger), pinch-resize (2 fingers), tap = pause/play
+  /* drag (1 finger), pinch-resize (2 fingers), tap */
   const pts = new Map();
   let start = null;
   const snapshot = () => {
     const p = [...pts.values()];
     start = {
-      left, top, w,
-      t: performance.now(),
-      moved: false,
+      left: o.left, top: o.top, w: o.w,
+      t: performance.now(), moved: false,
       p0: { ...p[0] },
       dist: p.length > 1 ? Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) : 0,
       mid: p.length > 1 ? { x: (p[0].x + p[1].x) / 2, y: (p[0].y + p[1].y) / 2 } : null,
       n: p.length
     };
   };
-  win.addEventListener('pointerdown', e => {
-    front();
-    win.setPointerCapture(e.pointerId);
+  const clampPos = () => {
+    o.left = Math.min(Math.max(o.left, -o.w + 60), innerWidth - 60);
+    o.top = Math.min(Math.max(o.top, 0), innerHeight - 60);
+  };
+  el.addEventListener('pointerdown', e => {
+    front(o);
+    el.classList.remove('anim');
+    el.setPointerCapture(e.pointerId);
     pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
     const wasMoved = start && start.moved;
     snapshot();
     if (wasMoved || pts.size > 1) start.moved = true;
   });
-  win.addEventListener('pointermove', e => {
+  el.addEventListener('pointermove', e => {
     if (!pts.has(e.pointerId)) return;
     pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
     const p = [...pts.values()];
@@ -279,55 +416,94 @@ function openWin(it, x, y) {
       const mid = { x: (p[0].x + p[1].x) / 2, y: (p[0].y + p[1].y) / 2 };
       const nw = Math.min(Math.max(start.w * d / start.dist, 140), innerWidth * 1.6);
       const cx = start.left + start.w / 2 + (mid.x - start.mid.x);
-      const cy = start.top + start.w / aspect / 2 + (mid.y - start.mid.y);
-      w = nw; h = w / aspect; left = cx - w / 2; top = cy - h / 2;
-      start.moved = true; place();
+      const cy = start.top + start.w / o.aspect / 2 + (mid.y - start.mid.y);
+      o.w = nw; o.h = o.w / o.aspect; o.left = cx - o.w / 2; o.top = cy - o.h / 2;
+      start.moved = true; o.adjusted = true; apply(o, false);
     } else if (p.length === 1) {
       const dx = p[0].x - start.p0.x, dy = p[0].y - start.p0.y;
       if (!start.moved && Math.hypot(dx, dy) < 8) return;
-      start.moved = true;
-      left = start.left + dx; top = start.top + dy; clampPos(); place();
+      start.moved = true; o.adjusted = true;
+      o.left = start.left + dx; o.top = start.top + dy; clampPos(); apply(o, false);
     }
   });
   const end = e => {
     if (!pts.has(e.pointerId)) return;
     pts.delete(e.pointerId);
     if (pts.size === 0) {
-      if (!start.moved && performance.now() - start.t < 350 && e.type === 'pointerup') {
-        if (v.muted) v.muted = false;
-        v.paused ? v.play() : v.pause();
-      }
+      if (!start.moved && performance.now() - start.t < 350 && e.type === 'pointerup') onTap();
       start = null;
     } else {
       snapshot(); start.moved = true;
     }
   };
-  win.addEventListener('pointerup', end);
-  win.addEventListener('pointercancel', end);
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
+
+  function onTap() {
+    // On iPad: first tap on a silent window gives it the sound; tap again to pause/play.
+    if (IOS && audible !== o) {
+      giveSound(o);
+      if (v.paused) { o.userPaused = false; v.play().catch(() => {}); }
+      return;
+    }
+    if (v.muted) v.muted = false;
+    if (v.paused) { o.userPaused = false; v.play().catch(() => {}); }
+    else { o.userPaused = true; v.pause(); }
+  }
 }
 
-/* ---------- spacebar = reset everything ---------- */
+/* ================= fullscreen: two-finger tap on empty space, or the F key ================= */
+function toggleFullscreen() {
+  const d = document, el = d.documentElement;
+  const isFs = d.fullscreenElement || d.webkitFullscreenElement;
+  try {
+    if (isFs) (d.exitFullscreen || d.webkitExitFullscreen).call(d);
+    else (el.requestFullscreen || el.webkitRequestFullscreen).call(el);
+  } catch (err) { console.warn('fullscreen not available', err); }
+}
+let twoTap = null;
+list.addEventListener('touchstart', e => {
+  if (e.touches.length === 2 && ![...e.touches].some(t => t.target.closest && t.target.closest('.t'))) {
+    twoTap = { t: performance.now(), x: e.touches[0].clientX, y: e.touches[0].clientY };
+    if (lp) { clearTimeout(lp); lp = null; }
+  } else if (e.touches.length > 2) twoTap = null;
+}, { passive: true });
+list.addEventListener('touchmove', e => {
+  if (twoTap && Math.hypot(e.touches[0].clientX - twoTap.x, e.touches[0].clientY - twoTap.y) > 12) twoTap = null;
+}, { passive: true });
+list.addEventListener('touchend', e => {
+  if (twoTap && e.touches.length === 0) {
+    if (performance.now() - twoTap.t < 400) toggleFullscreen();
+    twoTap = null;
+  }
+});
+document.addEventListener('keydown', e => {
+  if ((e.key === 'f' || e.key === 'F') && !e.metaKey && !e.ctrlKey) toggleFullscreen();
+});
+
+/* ================= spacebar = reset everything ================= */
 document.addEventListener('keydown', e => {
   if (e.code !== 'Space' && e.key !== ' ') return;
   e.preventDefault();
-  document.querySelectorAll('.win').forEach(w => {
-    const v = w.querySelector('video');
-    if (v) { v.pause(); v.removeAttribute('src'); v.load(); }
-    w.remove();
-  });
+  [...wins].forEach(o => { o.closed = true; o.v.pause(); o.v.removeAttribute('src'); o.v.load(); o.el.remove(); });
+  wins.length = 0;
+  audible = null;
   z = 10;
   window.scrollTo(0, 0);
 });
 
-/* ---------- boot ---------- */
+/* ================= boot ================= */
 (async () => {
   const stored = await loadStored();
   if (stored.length) {
-    items = stored.map(s => ({ title: titleOf(s.name), src: URL.createObjectURL(s.blob) }));
+    for (const s of stored) {
+      if (isDuplicate(s.name, s.size, s.mod)) continue;
+      items.push({ title: s.name, src: URL.createObjectURL(s.blob), size: s.size, mod: s.mod });
+    }
   } else {
     const found = await Promise.all(MANIFEST.map(async n => {
       const src = encodeURI(n);
-      return (await probe(src)) ? { title: titleOf(n), src } : null;
+      return (await probe(src)) ? { title: n, src } : null;
     }));
     items = found.filter(Boolean);
   }
@@ -336,3 +512,4 @@ document.addEventListener('keydown', e => {
 render();
 </script>
 </body>
+</html>
