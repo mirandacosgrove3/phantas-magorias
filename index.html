@@ -113,47 +113,49 @@
   #kb.open { opacity: 1; transform: none; pointer-events: auto; }
   .dial { position: absolute; inset: 0; border-radius: 50%; cursor: grab; }
   .dial svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-  .wedge { fill: #1c1c1f; stroke: #1c1c1f; stroke-width: 9; stroke-linejoin: round; transition: fill .16s, stroke .16s; }
-  .wedge.sel { fill: #ff3d9a; stroke: #ff3d9a; }
+  .wedge { fill: rgba(0,0,0,.88); stroke: rgba(255,255,255,.24); stroke-width: 1; vector-effect: non-scaling-stroke; transition: fill .2s, stroke .2s; }
+  .wedge.sel { fill: rgba(255,111,181,.09); stroke: #ff6fb5; }
   .chunk {
     position: absolute; left: 0; top: 0; pointer-events: none; white-space: nowrap;
-    font-weight: 700; font-size: clamp(15px, 1.7vw, 19px); letter-spacing: .05em; color: rgba(255,255,255,.85);
+    font-weight: 200; font-size: clamp(15px, 1.65vw, 19px); letter-spacing: .06em; color: rgba(255,255,255,.72);
+    transition: color .2s;
     will-change: transform;
   }
-  .chunk.sel { color: #fff; }
+  .chunk.sel { color: #ff6fb5; }
   #kb.open .chunk { animation: rin .45s ease backwards; animation-delay: calc(var(--i) * 25ms + 100ms); }
   @keyframes rin { from { opacity: 0; } }
   .hub {
     position: absolute; left: 27%; top: 27%; width: 46%; height: 46%; border-radius: 50%;
-    background: #000; box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.92);
+    background: #000; box-shadow: inset 0 0 0 1px rgba(255,255,255,.3);
     display: flex; flex-direction: column; align-items: center; justify-content: center;
   }
   .trio { display: flex; gap: 2px; align-items: center; }
   .trio .L {
     min-width: 1.05em; padding: 4px 3px; text-align: center; cursor: pointer;
-    font-weight: 700; font-size: clamp(34px, 4.1vw, 48px); line-height: 1; color: #fff;
+    font-weight: 100; font-size: clamp(36px, 4.3vw, 52px); line-height: 1; color: #fff;
     transition: color .1s, transform .1s;
   }
-  .trio .L.down { color: #ff3d9a; transform: scale(.9); }
+  .trio .L.down { color: #ff6fb5; transform: scale(.92); }
   .trio .L.in { animation: flipin .34s cubic-bezier(.2,.9,.3,1.25) backwards; animation-delay: calc(var(--k) * 45ms); }
   @keyframes flipin { from { opacity: 0; transform: perspective(220px) rotateX(-85deg) translateY(-8px); } }
   .trio.emo { flex-direction: column; gap: 0; }
-  .trio.emo .L { min-width: 0; padding: 5px 8px; font-size: clamp(12px, 1.3vw, 15px); font-weight: 500; }
-  .hub-mode { margin-top: 2px; padding: 6px 10px; font-size: 12px; font-weight: 700; letter-spacing: .12em; color: rgba(255,255,255,.45); cursor: pointer; }
-  .hub-mode.down { color: #ff3d9a; }
+  .trio.emo .L { min-width: 0; padding: 5px 8px; font-size: clamp(12px, 1.3vw, 15px); font-weight: 300; }
+  .hub-mode { margin-top: 2px; padding: 6px 10px; font-size: 13px; font-weight: 300; letter-spacing: .06em; color: rgba(255,255,255,.55); cursor: pointer; display: flex; align-items: center; gap: 6px; }
+  .hub-mode::before { content: ""; width: 5px; height: 5px; border-right: 1px solid #ff6fb5; border-bottom: 1px solid #ff6fb5; transform: translateY(-2px) rotate(45deg); }
+  .hub-mode.down { color: #ff6fb5; }
   /* controls live to the left of the wheel, away from the spinning hand */
   .bar { position: absolute; right: calc(100% + 22px); bottom: 7%; display: flex; align-items: center; gap: 20px; white-space: nowrap; }
-  .ctl { font-size: 15px; font-weight: 700; color: rgba(255,255,255,.8); cursor: pointer; padding: 8px 0; transition: opacity .1s, transform .1s; }
+  .ctl { font-size: 15px; font-weight: 200; letter-spacing: .04em; color: rgba(255,255,255,.75); cursor: pointer; padding: 8px 0; transition: opacity .1s, transform .1s; }
   .ctl.down { opacity: .45; transform: scale(.96); }
   .ctl.cancel { color: #ff3b4a; }
-  .ctl.add { color: rgba(255,255,255,.5); }
-  .ctl.enter { color: #00211e; background: #2ee6d2; padding: 9px 22px; border-radius: 999px; }
+  .ctl.add { color: rgba(255,255,255,.45); }
+  .ctl.enter { color: #2ee6d2; text-shadow: 0 0 12px rgba(46,230,210,.55); }
   #kb.open .bar { animation: kin .4s ease backwards; animation-delay: .18s; }
   @keyframes kin { from { opacity: 0; } }
   .fly {
     position: fixed; z-index: 100001; pointer-events: none;
-    transform: translate(-50%, -50%); color: #ff3d9a; font-weight: 700;
-    font-size: clamp(34px, 4.1vw, 48px);
+    transform: translate(-50%, -50%); color: #ff6fb5; font-weight: 100;
+    font-size: clamp(36px, 4.3vw, 52px);
     transition: transform .42s cubic-bezier(.3,.7,.2,1), opacity .42s ease-in;
   }
 </style>
@@ -1034,11 +1036,26 @@ function pressable(el, fn, repeat) {
 
 // one rounded segment, centred on angle 0 (each is rotated into place)
 function wedgePath(step) {
-  const sw = 4.5, gap = 1.6;                          // half the stroke (rounding) + half the gap between segments
-  const rIn = 50 + sw, rOut = 99 - sw;
-  const hIn = step / 2 - (gap + sw) / rIn, hOut = step / 2 - (gap + sw) / rOut;
-  const P = (r, a) => `${(100 + r * Math.cos(a)).toFixed(2)} ${(100 + r * Math.sin(a)).toFixed(2)}`;
-  return `M ${P(rOut, -hOut)} A ${rOut} ${rOut} 0 0 1 ${P(rOut, hOut)} L ${P(rIn, hIn)} A ${rIn} ${rIn} 0 0 0 ${P(rIn, -hIn)} Z`;
+  const gap = 2.2, rc = 6;                            // half-gap between segments, corner radius
+  const rIn = 52, rOut = 98;
+  const hIn = step / 2 - gap / rIn, hOut = step / 2 - gap / rOut;
+  const pt = (r, a) => [100 + r * Math.cos(a), 100 + r * Math.sin(a)];
+  const lerp = (p, q, t) => [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t];
+  const f = p => `${p[0].toFixed(2)} ${p[1].toFixed(2)}`;
+  const O0 = pt(rOut, -hOut), O1 = pt(rOut, hOut), I1 = pt(rIn, hIn), I0 = pt(rIn, -hIn);
+  const side = Math.hypot(O1[0] - I1[0], O1[1] - I1[1]), t = rc / side;
+  return [
+    `M ${f(pt(rOut, -hOut + rc / rOut))}`,
+    `A ${rOut} ${rOut} 0 0 1 ${f(pt(rOut, hOut - rc / rOut))}`,
+    `Q ${f(O1)} ${f(lerp(O1, I1, t))}`,
+    `L ${f(lerp(I1, O1, t))}`,
+    `Q ${f(I1)} ${f(pt(rIn, hIn - rc / rIn))}`,
+    `A ${rIn} ${rIn} 0 0 0 ${f(pt(rIn, -hIn + rc / rIn))}`,
+    `Q ${f(I0)} ${f(lerp(I0, O0, t))}`,
+    `L ${f(lerp(O0, I0, t))}`,
+    `Q ${f(O0)} ${f(pt(rOut, -hOut + rc / rOut))}`,
+    'Z'
+  ].join(' ');
 }
 
 function buildWheel() {
@@ -1064,9 +1081,9 @@ function drawDial() {
   for (let i = 0; i < N; i++) {
     const a = rot + i * step, d = wrapA(a - SEL);
     const m = Math.exp(-((d / (step * 0.6)) ** 2));                    // the selected segment lifts outward a little
-    wedges[i].setAttribute('transform', `rotate(${(a * 180 / Math.PI).toFixed(3)} 100 100) translate(${(3.5 * m).toFixed(2)} 0)`);
-    const r = rLab + 3.5 * m * D / 200;
-    labels[i].style.transform = `translate(${c + r * Math.cos(a)}px, ${c + r * Math.sin(a)}px) translate(-50%, -50%) scale(${1 + 0.08 * m})`;
+    wedges[i].setAttribute('transform', `rotate(${(a * 180 / Math.PI).toFixed(3)} 100 100) translate(${(2.5 * m).toFixed(2)} 0)`);
+    const r = rLab + 2.5 * m * D / 200;
+    labels[i].style.transform = `translate(${c + r * Math.cos(a)}px, ${c + r * Math.sin(a)}px) translate(-50%, -50%) scale(${1 + 0.06 * m})`;
   }
   const idx = ((Math.round((SEL - rot) / step) % N) + N) % N;
   if (idx !== selIdx) { selIdx = idx; showSel(); }
@@ -1252,7 +1269,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-13-050035';
+const BUILD = '2026-11-13-050358';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
