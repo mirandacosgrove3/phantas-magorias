@@ -103,7 +103,7 @@
   /* ---- keyboard: a precise rotary speller, bottom-right ---- */
   #kb {
     position: fixed; z-index: 100000;
-    right: calc(64px + env(safe-area-inset-right));
+    right: calc(26px + env(safe-area-inset-right));
     bottom: calc(26px + env(safe-area-inset-bottom));
     width: clamp(280px, 32vw, 360px); aspect-ratio: 1 / 1;
     touch-action: none; pointer-events: none; opacity: 0;
@@ -112,9 +112,19 @@
   }
   #kb.open { opacity: 1; transform: none; pointer-events: auto; }
   .dial { position: absolute; inset: 0; border-radius: 50%; cursor: grab; background: #000; }
-  .track { position: absolute; border-radius: 50%; pointer-events: none; }
-  .track.t1 { inset: 21%; box-shadow: inset 0 0 0 1px rgba(255,255,255,.22); }
-  .track.t2 { inset: 0; box-shadow: inset 0 0 0 1px rgba(255,255,255,.1); }
+  .track { position: absolute; inset: 0; border-radius: 50%; pointer-events: none; box-shadow: inset 0 0 0 1px rgba(255,255,255,.1); }
+  /* fine compass ticks around the edge; they turn with the ring */
+  .ticks, .ticks2 { position: absolute; inset: 1.5%; border-radius: 50%; pointer-events: none; will-change: transform; }
+  .ticks {
+    background: repeating-conic-gradient(rgba(255,255,255,.38) 0deg .45deg, transparent .45deg 5deg);
+    -webkit-mask: radial-gradient(closest-side, transparent 93.5%, #000 94%, #000 99%, transparent 99.5%);
+            mask: radial-gradient(closest-side, transparent 93.5%, #000 94%, #000 99%, transparent 99.5%);
+  }
+  .ticks2 {
+    background: repeating-conic-gradient(rgba(255,255,255,.85) 0deg .6deg, transparent .6deg 30deg);
+    -webkit-mask: radial-gradient(closest-side, transparent 90.5%, #000 91%, #000 99%, transparent 99.5%);
+            mask: radial-gradient(closest-side, transparent 90.5%, #000 91%, #000 99%, transparent 99.5%);
+  }
   .beam {
     position: absolute; left: 50%; top: 50%; height: 16px; margin-top: -8px;
     transform-origin: 0 50%; pointer-events: none;
@@ -131,7 +141,13 @@
   .ri.sel { color: #ff3d9a; font-weight: 400; }
   .hub { position: absolute; left: 29%; top: 29%; width: 42%; height: 42%; border-radius: 50%; cursor: pointer; }
   .hub .rim { position: absolute; inset: 0; border-radius: 50%; box-shadow: inset 0 0 0 1.5px #fff; pointer-events: none; }
-  .hub .rim2 { position: absolute; inset: 0; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(255,255,255,.4); transform: translate(-5px, -4px); pointer-events: none; }
+  /* knurled inner edge of the knob; turns with the ring */
+  .hub .knurl {
+    position: absolute; inset: 0; border-radius: 50%; pointer-events: none; will-change: transform;
+    background: repeating-conic-gradient(rgba(255,255,255,.3) 0deg .9deg, transparent .9deg 4deg);
+    -webkit-mask: radial-gradient(closest-side, transparent 87%, #000 88%, #000 95%, transparent 96%);
+            mask: radial-gradient(closest-side, transparent 87%, #000 88%, #000 95%, transparent 96%);
+  }
   .hub .glow {
     position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
     background: conic-gradient(from var(--a, 275deg), rgba(255,40,140,0) 0deg, rgba(255,40,140,.55) 40deg, rgba(255,40,140,0) 80deg, transparent 80deg);
@@ -147,18 +163,16 @@
   .hub-char.long { font-size: clamp(13px, 1.4vw, 17px); white-space: nowrap; font-weight: 400; }
   .hub-mode { margin-top: 6px; padding: 6px 10px; font-size: 15px; font-weight: 300; color: rgba(255,255,255,.75); display: flex; align-items: center; gap: 6px; cursor: pointer; }
   .hub-mode::before { content: ""; width: 6px; height: 6px; border-right: 1.5px solid #ff3d9a; border-bottom: 1.5px solid #ff3d9a; transform: translateY(-2px) rotate(45deg); }
-  .stack { position: absolute; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; transform: translateY(-50%); }
-  .ctl { position: relative; padding: 5px 8px 5px 14px; font-size: 14px; font-weight: 400; letter-spacing: .02em; color: #fff; cursor: pointer; white-space: nowrap; transition: opacity .1s; }
-  .ctl.down { opacity: .45; }
-  .ctl::before { content: ""; position: absolute; left: 0; top: 7px; bottom: 7px; width: 2px; background: rgba(255,255,255,.25); }
-  .ctl.enter { color: #2ee6d2; }
-  .ctl.enter::before { background: #2ee6d2; box-shadow: 0 0 8px rgba(46,230,210,.8); }
+  /* controls live to the left of the dial, away from the spinning hand */
+  .bar { position: absolute; right: calc(100% + 22px); bottom: 7%; display: flex; align-items: center; gap: 20px; white-space: nowrap; }
+  .ctl { font-size: 15px; font-weight: 400; color: rgba(255,255,255,.8); cursor: pointer; padding: 8px 0; transition: opacity .1s, transform .1s; }
+  .ctl.down { opacity: .45; transform: scale(.96); }
   .ctl.cancel { color: #ff3b4a; }
-  .ctl.cancel::before { background: #ff3b4a; }
-  .ctl.add { color: rgba(255,255,255,.6); }
+  .ctl.add { color: rgba(255,255,255,.5); }
+  .ctl.enter { color: #00211e; background: #2ee6d2; padding: 9px 22px; border-radius: 999px; }
   #kb.open .ri { animation: rin .45s ease backwards; animation-delay: calc(var(--i) * 8ms + 80ms); }
   @keyframes rin { from { opacity: 0; } }
-  #kb.open .stack { animation: kin .4s ease backwards; animation-delay: .18s; }
+  #kb.open .bar { animation: kin .4s ease backwards; animation-delay: .18s; }
   @keyframes kin { from { opacity: 0; } }
   .fly {
     position: fixed; z-index: 100001; pointer-events: none;
@@ -1003,8 +1017,7 @@ const MODES = [
 ];
 const SEL = -Math.PI * 3 / 4;                       // selection point: up-left, facing into the screen
 let mode = 0, rot = SEL, vel = 0, dialRAF = 0, selIdx = -1, dragging = false, snapTarget = null;
-let dial, ring, hub, hubChar, hubMode, hubGlow, beam, tickEl, stack, ringEls = [];
-const GAP = 0.62;   // half-width (radians) of the open gap at 3 o'clock where the controls sit
+let dial, ring, hub, hubChar, hubMode, hubGlow, beam, tickEl, ticksA, ticksB, knurl, ringEls = [];
 
 const TAU = Math.PI * 2;
 const wrapA = a => { a = (a + Math.PI) % TAU; if (a < 0) a += TAU; return a - Math.PI; };
@@ -1050,13 +1063,10 @@ function drawDial() {
   for (let i = 0; i < N; i++) {
     const a = rot + i * step, d = wrapA(a - SEL);
     const m = Math.exp(-((d / 0.22) ** 2));                          // slight swell near the pointer
-    const g = Math.abs(wrapA(a));                                     // distance from 3 o'clock gap
-    const gapFade = Math.max(0, Math.min(1, (g - GAP) / 0.22));
-    const fade = (0.35 + 0.65 * Math.max(0, 1 - Math.abs(d) / 2.6)) * gapFade;
+    const fade = 0.3 + 0.7 * Math.max(0, 1 - Math.abs(d) / 2.8);
     const el = ringEls[i];
     el.style.transform = `translate(${c + R * Math.cos(a)}px, ${c + R * Math.sin(a)}px) translate(-50%, -50%) scale(${1 + 0.55 * m})`;
     el.style.opacity = fade.toFixed(3);
-    el.style.pointerEvents = gapFade > 0.5 ? 'auto' : 'none';
   }
   // pointer: beam from the hub edge out to the ring, and a tick just outside the ring
   const hubR = D * 0.21;
@@ -1067,8 +1077,8 @@ function drawDial() {
   tickEl.style.top = (c + tr * Math.sin(SEL) - 8) + 'px';
   tickEl.style.transform = `rotate(${SEL + Math.PI / 2}rad)`;
   hubGlow.style.setProperty('--a', (SEL * 180 / Math.PI + 90 - 40) + 'deg');
-  stack.style.left = (c + D * 0.255) + 'px';                     // sits inside the disc, in the gap
-  stack.style.top = c + 'px';
+  const turn = `rotate(${rot}rad)`;                                 // ticks + knurl turn with the ring
+  ticksA.style.transform = turn; ticksB.style.transform = turn; knurl.style.transform = turn;
   const idx = ((Math.round((SEL - rot) / step) % N) + N) % N;
   if (idx !== selIdx) { selIdx = idx; showSel(); }
 }
@@ -1135,28 +1145,29 @@ function setMode(next) {
 
 function buildKb() {
   dial = document.createElement('div'); dial.className = 'dial';
-  const t1 = document.createElement('div'); t1.className = 'track t1';
-  const t2 = document.createElement('div'); t2.className = 'track t2';
+  const t2 = document.createElement('div'); t2.className = 'track';
+  ticksA = document.createElement('div'); ticksA.className = 'ticks';
+  ticksB = document.createElement('div'); ticksB.className = 'ticks2';
   beam = document.createElement('div'); beam.className = 'beam';
   tickEl = document.createElement('div'); tickEl.className = 'tick';
   ring = document.createElement('div'); ring.style.cssText = 'position:absolute;inset:0;';
   hub = document.createElement('div'); hub.className = 'hub';
   hubGlow = document.createElement('div'); hubGlow.className = 'glow';
-  const rim2 = document.createElement('div'); rim2.className = 'rim2';
+  knurl = document.createElement('div'); knurl.className = 'knurl';
   const rim = document.createElement('div'); rim.className = 'rim';
   const face = document.createElement('div'); face.className = 'face';
   hubChar = mk('hub-char', 'a');
   hubMode = mk('hub-mode', MODES[mode].label);
   face.append(hubChar, hubMode);
-  hub.append(hubGlow, rim2, rim, face);
-  dial.append(t2, t1, beam, ring, hub, tickEl);
+  hub.append(hubGlow, knurl, rim, face);
+  dial.append(t2, ticksA, ticksB, beam, ring, hub, tickEl);
 
-  stack = document.createElement('div'); stack.className = 'stack';
+  const bar = document.createElement('div'); bar.className = 'bar';
   const enter = mk('ctl enter', 'OK');
   const del = mk('ctl', 'delete');
   const cancel = mk('ctl cancel', 'cancel');
   const add = mk('ctl add', '+ videos');
-  stack.append(enter, del, cancel, add);
+  bar.append(cancel, add, del, enter);
   pressable(del, () => typeKey('⌫'), true);
   pressable(cancel, () => finishEdit(false));
   pressable(enter, () => finishEdit(true));
@@ -1168,7 +1179,7 @@ function buildKb() {
   pressable(hub, placeSel);
   pressable(hubMode, () => setMode(mode + 1));
 
-  kb.append(dial, stack);
+  kb.append(dial, bar);
   buildRing();
 
   // one-finger spinning
@@ -1260,7 +1271,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-13-044921';
+const BUILD = '2026-11-13-045343';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
