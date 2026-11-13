@@ -180,6 +180,47 @@
   .kbtn.down .ico { transform: translate(-50%, -50%) scale(.88); }
   .kbtn.on { color: #ff6fb5; }
   .kbtn.heart.on .ico { fill: rgba(255,111,181,.4); }
+  .kbtn.caps.lock .shape path { fill: rgba(255,111,181,.24); }
+  .kbtn.ext { top: 0; left: 0; }
+  .kbtn.ext .ico { stroke-width: 2.6; transition: transform .35s cubic-bezier(.2,.9,.3,1.2), color .15s; }
+  .kbtn.ext.on .ico { transform: translate(-50%, -50%) rotate(180deg); }
+
+  /* bottom-row keyboard icon (summons the iPad's own keyboard) */
+  .ctl.kbd svg { width: 26px; height: 26px; display: block; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+  #native { position: fixed; left: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; font-size: 16px; border: 0; padding: 0; pointer-events: none; }
+
+  /* pull-out keyboard: a plain grid keyboard that extends out of the wheel to the left */
+  .xkb {
+    position: fixed; z-index: 100000;
+    right: calc(26px + clamp(290px, 34vw, 380px) + 22px + env(safe-area-inset-right));
+    bottom: calc(92px + env(safe-area-inset-bottom));
+    width: min(680px, calc(100vw - clamp(290px, 34vw, 380px) - 96px));
+    padding: 14px; border-radius: 22px; box-sizing: border-box;
+    background: rgba(0,0,0,.92); box-shadow: inset 0 0 0 1px rgba(255,255,255,.2);
+    clip-path: inset(0 0 0 100% round 22px); opacity: 0; pointer-events: none;
+    transition: clip-path .55s cubic-bezier(.2,.9,.25,1), opacity .2s ease;
+    touch-action: none;
+  }
+  .xkb.open { clip-path: inset(0 0 0 0 round 22px); opacity: 1; pointer-events: auto; }
+  .emo-strip {
+    position: relative; overflow: hidden; height: 42px; border-radius: 12px; margin-bottom: 4px;
+    background: rgba(255,255,255,.04); box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); cursor: grab;
+    -webkit-mask: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent);
+            mask: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent);
+  }
+  .emo-track { position: absolute; left: 0; top: 0; height: 100%; display: flex; align-items: center; gap: 26px; padding: 0 13px; white-space: nowrap; will-change: transform; }
+  .emo { font-size: 15px; font-weight: 300; color: rgba(255,255,255,.82); transition: color .1s; }
+  .emo.down { color: #ff6fb5; }
+  .xrow { display: grid; grid-template-columns: repeat(13, 1fr); gap: 6px; margin-top: 6px; }
+  .xrow.nums { grid-template-columns: repeat(10, 1fr); }
+  .xk {
+    height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer;
+    font-size: 20px; font-weight: 200; color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,.2);
+    transition: color .1s, box-shadow .1s, background .1s, transform .08s;
+  }
+  .xrow.nums .xk { font-size: 17px; background: rgba(255,255,255,.075); box-shadow: inset 0 0 0 1px rgba(255,255,255,.14); }
+  .xk.down { color: #ff6fb5; box-shadow: inset 0 0 0 1px #ff6fb5; background: rgba(255,111,181,.09); transform: scale(.95); }
+  .xkb.open .xk { animation: kin .35s ease backwards; animation-delay: calc(var(--i) * 6ms + 120ms); }
   #kb.open .kbtn { animation: kin .4s ease backwards; animation-delay: .18s; }
   @keyframes kin { from { opacity: 0; } }
   .fly {
@@ -990,6 +1031,7 @@ function typeKey(k) {
     editing.buf += ch; parts.push(ch);
   }
   editing.txt.textContent = editing.buf;
+  if (nativeIn && document.activeElement === nativeIn) nativeIn.value = editing.buf;
 }
 
 function finishEdit(save) {
@@ -1046,8 +1088,9 @@ const RINGS = {
   inner: { rIn: 38.5, rOut: 56, rc: 4, gap: 1.8, lab: 47.5, cls: 'num', chunks: () => NUMS }
 };
 for (const k in RINGS) Object.assign(RINGS[k], { rot: SEL, vel: 0, snap: null, raf: 0, wedges: [], labels: [], sel: -1, drag: false });
-let mode = 0, active = 'outer', caps = false, emote = false;
-let dial, svg, hub, trio, capsBtn, heartBtn, bar;
+let mode = 0, active = 'outer', capsState = 'off', emote = false;   // capsState: off | once | lock
+let dial, svg, hub, trio, capsBtn, heartBtn, extBtn, bar, xkb, nativeIn, xKeys = [];
+const isLetter = ch => /^[a-z]$/i.test(ch);
 
 /* Tap = fire on release only if the finger didn't travel. repeat: fire on press and while held. */
 function pressable(el, fn, repeat) {
@@ -1181,6 +1224,7 @@ function placeChar(it, fromEl) {
   const caret = document.querySelector('.t.editing .caret');
   const from = fromEl.getBoundingClientRect(), to = caret && caret.getBoundingClientRect();
   typeKey(it === '␣' ? 'space' : it);
+  if (capsState === 'once' && isLetter(it)) { capsState = 'off'; applyCase(); }
   if (to && it !== '␣') {
     const f = mk('fly', it);
     const fx = from.left + from.width / 2, fy = from.top + from.height / 2;
@@ -1196,9 +1240,31 @@ function placeChar(it, fromEl) {
 }
 
 // caps (C) and heart (B) pick the outer ring's set: abc / ABC / kaomoji
+// Shift: tap once = next letter only, double-tap = caps lock, tap again = off.
+// Switches case in place (no swirl) on the wheel and the pull-out keyboard.
+function applyCase() {
+  const up = capsState !== 'off';
+  capsBtn.classList.toggle('on', up);
+  capsBtn.classList.toggle('lock', capsState === 'lock');
+  xKeys.forEach(k => { if (isLetter(k.dataset.c)) k.textContent = up ? k.dataset.c.toUpperCase() : k.dataset.c; });
+  if (emote) return;
+  mode = up ? 1 : 0;
+  const g = RINGS.outer;
+  g.labels.forEach((l, i) => { l.textContent = MODES[mode].chunks[i].label; });
+  if (active === 'outer') showSel();
+}
+let lastCapsTap = 0;
+function tapCaps() {
+  const now = performance.now();
+  if (capsState === 'once' && now - lastCapsTap < 350) capsState = 'lock';
+  else capsState = capsState === 'off' ? 'once' : 'off';
+  lastCapsTap = now;
+  if (emote) { emote = false; setMode(capsState !== 'off' ? 1 : 0); }
+  applyCase();
+}
 function setMode(next) {
   mode = (next + MODES.length) % MODES.length;
-  capsBtn.classList.toggle('on', caps && !emote);
+  capsBtn.classList.toggle('on', capsState !== 'off' && !emote);
   heartBtn.classList.toggle('on', emote);
   buildRing('outer');
   active = 'outer';
@@ -1230,7 +1296,8 @@ function buildKb() {
   const CORNERS = {
     'k-del': { rot: 0,   box: '136 0 64 64',   at: [79, 21] },
     'caps':  { rot: 90,  box: '136 136 64 64', at: [79, 79] },
-    'heart': { rot: 180, box: '0 136 64 64',   at: [21, 79] }
+    'heart': { rot: 180, box: '0 136 64 64',   at: [21, 79] },
+    'ext':   { rot: 270, box: '0 0 64 64',     at: [21, 21] }
   };
   const icon = (cls, paths) => {
     const k = CORNERS[cls];
@@ -1243,23 +1310,40 @@ function buildKb() {
   heartBtn = icon('heart', '<path d="M12 19.5s-7.5-4.6-7.5-10.2A4.1 4.1 0 0 1 12 6.9a4.1 4.1 0 0 1 7.5 2.4c0 5.6-7.5 10.2-7.5 10.2z"/>');
   capsBtn = icon('caps', '<path d="M12 4.5l7 7h-3.8v4.2H8.8v-4.2H5z"/><path d="M8.8 19.5h6.4"/>');
   pressable(del, () => typeKey('⌫'), true);
-  pressable(capsBtn, () => { caps = !caps; emote = false; setMode(caps ? 1 : 0); });
-  pressable(heartBtn, () => { emote = !emote; setMode(emote ? 2 : (caps ? 1 : 0)); });
+  extBtn = icon('ext', '<path d="M14.5 5.5H5.5v9"/><path d="M5.8 5.8l11.7 11.7"/>');
+  pressable(capsBtn, tapCaps);
+  pressable(heartBtn, () => { emote = !emote; setMode(emote ? 2 : (capsState !== 'off' ? 1 : 0)); });
+  pressable(extBtn, () => toggleXkb());
 
   bar = document.createElement('div'); bar.className = 'bar';
   bar.addEventListener('pointerdown', e => e.stopPropagation());
   const enter = mk('ctl enter', 'OK');
   const cancel = mk('ctl cancel', 'cancel');
   const add = mk('ctl add', '+ videos');
-  bar.append(cancel, add, enter);
+  const kbd = document.createElement('div'); kbd.className = 'ctl kbd';
+  kbd.innerHTML = '<svg viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2.2"/><path d="M6 9.5h.01M9 9.5h.01M12 9.5h.01M15 9.5h.01M18 9.5h.01M6.5 12.5h.01M9.5 12.5h.01M12.5 12.5h.01M15.5 12.5h.01M8 15.2h8"/></svg>';
+  // focusing must happen inside the tap itself or iPadOS won't raise its keyboard
+  kbd.addEventListener('pointerdown', e => { e.stopPropagation(); kbd.classList.add('down'); });
+  kbd.addEventListener('pointerup', () => kbd.classList.remove('down'));
+  kbd.addEventListener('click', e => {
+    e.stopPropagation();
+    if (!editing) return;
+    if (document.activeElement === nativeIn) { nativeIn.blur(); return; }
+    nativeIn.value = editing.buf;
+    nativeIn.focus();
+    try { nativeIn.setSelectionRange(nativeIn.value.length, nativeIn.value.length); } catch (err) {}
+  });
+  bar.append(cancel, add, kbd, enter);
   pressable(cancel, () => finishEdit(false));
   pressable(enter, () => finishEdit(true));
   // the file picker needs a real click to open on iPad
   add.addEventListener('pointerdown', e => { e.stopPropagation(); add.classList.add('down'); });
   add.addEventListener('pointerup', () => add.classList.remove('down'));
   add.addEventListener('click', e => { e.stopPropagation(); picker.click(); });
-  kb.append(dial, del, heartBtn, capsBtn);
+  kb.append(dial, del, heartBtn, capsBtn, extBtn);
   document.body.append(bar);
+  buildXkb();
+  buildNative();
   buildRing('inner'); buildRing('outer');
 
   // one-finger spinning of whichever ring you touch; a still tap on a segment spins to it
@@ -1316,11 +1400,97 @@ function buildKb() {
   }, { passive: false });
   addEventListener('resize', () => { if (kb.classList.contains('open')) { drawRing('inner'); drawRing('outer'); } });
 }
+/* ---- pull-out keyboard (top-left corner piece) ----
+   A plain grid keyboard in the same style: an idle-scrolling kaomoji strip on top
+   (touch to stop it, drag to scroll, tap one to place), a number row, then a-m / n-z. */
+let emoX = 0, emoHold = false, emoResume = 0, emoRAF = 0, emoTrack = null, emoHalf = 0;
+function buildXkb() {
+  xkb = document.createElement('div'); xkb.className = 'xkb';
+  xkb.addEventListener('pointerdown', e => e.stopPropagation());
+
+  const strip = document.createElement('div'); strip.className = 'emo-strip';
+  emoTrack = document.createElement('div'); emoTrack.className = 'emo-track';
+  const all = MODES[2].chunks.flatMap(c => c.items);
+  [...all, ...all].forEach(e => { const el = mk('emo', e); el.dataset.e = e; emoTrack.append(el); });
+  strip.append(emoTrack);
+  let sx = 0, startX = 0, moved = 0, downEl = null;
+  strip.addEventListener('pointerdown', e => {
+    e.preventDefault(); e.stopPropagation();
+    strip.setPointerCapture(e.pointerId);
+    emoHold = true; sx = e.clientX; startX = emoX; moved = 0;
+    downEl = e.target.closest('.emo'); if (downEl) downEl.classList.add('down');
+  });
+  strip.addEventListener('pointermove', e => {
+    if (!emoHold) return;
+    const dx = e.clientX - sx; moved = Math.max(moved, Math.abs(dx));
+    if (moved > 8 && downEl) { downEl.classList.remove('down'); downEl = null; }
+    emoX = startX + dx;
+  });
+  const up = () => {
+    if (!emoHold) return;
+    emoHold = false;
+    if (downEl) { downEl.classList.remove('down'); if (moved <= 8) placeChar(downEl.dataset.e, downEl); downEl = null; }
+    emoResume = performance.now() + 1800;                     // drift again after a pause
+  };
+  strip.addEventListener('pointerup', up);
+  strip.addEventListener('pointercancel', up);
+
+  const rows = [[...'1234567890'], [...'abcdefghijklm'], [...'nopqrstuvwxyz']];
+  let i = 0;
+  xKeys = [];
+  rows.forEach((r, ri) => {
+    const row = document.createElement('div'); row.className = 'xrow' + (ri === 0 ? ' nums' : '');
+    r.forEach(ch => {
+      const k = mk('xk', ch); k.dataset.c = ch; k.style.setProperty('--i', i++);
+      pressable(k, () => placeChar(capsState !== 'off' && isLetter(ch) ? ch.toUpperCase() : ch, k));
+      xKeys.push(k); row.append(k);
+    });
+    xkb.append(row);
+  });
+  xkb.prepend(strip);
+  document.body.append(xkb);
+}
+function emoLoop(now) {
+  emoRAF = requestAnimationFrame(emoLoop);
+  if (!emoHalf) emoHalf = emoTrack.scrollWidth / 2;
+  if (!emoHold && now > emoResume) emoX -= 0.45;
+  if (emoHalf) { while (emoX <= -emoHalf) emoX += emoHalf; while (emoX > 0) emoX -= emoHalf; }
+  emoTrack.style.transform = `translateX(${emoX}px)`;
+}
+function toggleXkb(force) {
+  const open = force === undefined ? !xkb.classList.contains('open') : force;
+  xkb.classList.toggle('open', open);
+  extBtn.classList.toggle('on', open);
+  cancelAnimationFrame(emoRAF);
+  if (open) { emoHalf = 0; emoResume = 0; emoRAF = requestAnimationFrame(emoLoop); }
+}
+
+/* ---- the iPad's own keyboard, via a hidden text field kept in sync with the title ---- */
+function buildNative() {
+  nativeIn = document.createElement('input');
+  nativeIn.id = 'native';
+  nativeIn.setAttribute('autocapitalize', 'off'); nativeIn.setAttribute('autocorrect', 'off');
+  nativeIn.setAttribute('autocomplete', 'off'); nativeIn.spellcheck = false;
+  nativeIn.addEventListener('input', () => {
+    if (!editing) return;
+    editing.cutting = false;
+    editing.buf = nativeIn.value;
+    editing.parts = [...nativeIn.value];
+    editing.txt.textContent = editing.buf;
+  });
+  nativeIn.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); finishEdit(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); finishEdit(false); }
+  });
+  document.body.append(nativeIn);
+}
+
 function updateShift() {}
 function openKb() {
   kb.classList.add('open'); kb.setAttribute('aria-hidden', 'false');
   bar.classList.add('open');
-  buildRing('inner'); buildRing('outer');                       // replays the label fade-in
+  buildRing('inner'); buildRing('outer');
+  applyCase();                       // replays the label fade-in
   active = 'outer';
   RINGS.outer.rot = SEL + 1.2; RINGS.outer.snap = SEL; spin('outer');
   RINGS.inner.rot = SEL - 1.0; RINGS.inner.snap = SEL; spin('inner');   // rings swirl in opposite ways
@@ -1328,6 +1498,8 @@ function openKb() {
 function closeKb() {
   kb.classList.remove('open'); kb.setAttribute('aria-hidden', 'true');
   bar.classList.remove('open');
+  toggleXkb(false);
+  if (document.activeElement === nativeIn) nativeIn.blur();
   for (const k in RINGS) cancelAnimationFrame(RINGS[k].raf);
 }
 kb.addEventListener('pointerdown', e => e.stopPropagation());
@@ -1337,6 +1509,7 @@ buildKb();
 // Hardware keyboard while renaming
 document.addEventListener('keydown', e => {
   if (!editing) return;
+  if (e.target === nativeIn) return;                      // the iPad keyboard types into its own field
   if (e.metaKey || e.ctrlKey) return;
   e.preventDefault(); e.stopPropagation();
   if (e.key === 'Enter') finishEdit(true);
@@ -1367,7 +1540,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-13-052800';
+const BUILD = '2026-11-13-053909';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
