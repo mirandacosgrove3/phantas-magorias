@@ -69,7 +69,9 @@
     object-fit: contain; background: #000;
     pointer-events: none;
   }
-  .x, .rs { position: absolute; width: 40px; height: 40px; touch-action: none; }
+  .x, .rs { position: absolute; width: 40px; height: 40px; touch-action: none; transition: opacity .2s ease; }
+  /* close + resize only on the active (top) window */
+  .win:not(.top) .x, .win:not(.top) .rs { opacity: 0; pointer-events: none; }
   .x { top: 0; left: 0; }
   .x::before, .x::after {
     content: ""; position: absolute; left: 13px; top: 19.5px;
@@ -466,9 +468,9 @@ function setRow(it, state) {          // 'idle' | 'active' | 'collapsed'
 let activeWin = null;
 function setActive(o) {
   if (activeWin === o) return;
-  if (activeWin && !activeWin.closed) setRow(activeWin.it, 'collapsed');
+  if (activeWin && !activeWin.closed) { setRow(activeWin.it, 'collapsed'); activeWin.el.classList.remove('top'); }
   activeWin = o;
-  if (o) setRow(o.it, 'active');
+  if (o) { setRow(o.it, 'active'); o.el.classList.add('top'); }
 }
 
 /* ================= windows ================= */
@@ -1109,7 +1111,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-13-010504';
+const BUILD = '2026-11-13-011517';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
