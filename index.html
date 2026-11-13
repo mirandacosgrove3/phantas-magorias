@@ -57,7 +57,6 @@
   .win.lockpulse { animation: lockpulse .5s ease; }
   @keyframes lockpulse { 40% { box-shadow: 0 0 0 1.5px rgba(255,170,215,.95), 0 0 0 5px rgba(255,111,181,.22), 0 0 40px rgba(255,111,181,.55); } }
   #list { position: relative; z-index: 1; }
-  #viz { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 0; pointer-events: none; }
   .aud { position: absolute; cursor: pointer; animation: audin .32s cubic-bezier(.2,.9,.3,1.3) backwards; }
   .aud canvas { width: 100%; height: 100%; display: block; }
   .aud.out { opacity: 0; transform: scale(.5); transition: opacity .18s, transform .18s; }
@@ -88,7 +87,6 @@
   #pick { display: none; }
 
   /* ---- rename mode ---- */
-  .t.editing { background: linear-gradient(90deg, rgba(255,111,181,.12), rgba(255,111,181,0) 60%); }
   .t.editing .etxt { color: #ff6fb5; }
   .t .eext { color: rgba(255,111,181,.45); }
   .caret {
@@ -644,114 +642,6 @@ function openWin(it, x, y) {
   }
 }
 
-/* ================= edge glass (experimental) =================
-   The bottom and right edges act like a sheet of liquid glass: open videos throw soft,
-   blurred, gently rippling reflections onto them. Reflections are drawn from tiny copies
-   of each frame, so they're naturally soft and cheap. */
-const viz = document.createElement('canvas');
-viz.id = 'viz';
-document.body.prepend(viz);
-const vg = viz.getContext('2d');
-const lo = document.createElement('canvas');
-const lg = lo.getContext('2d');
-const rc = document.createElement('canvas');
-const rg = rc.getContext('2d');
-let VW = 0, VH = 0, vframe = 0;
-function sizeViz() { VW = viz.width = Math.round(innerWidth); VH = viz.height = Math.round(innerHeight); }
-sizeViz();
-addEventListener('resize', sizeViz);
-
-function grabFrame(o) {
-  const v = o.v;
-  if (!v || v.readyState < 2 || !v.videoWidth) return null;
-  const sw = 40, sh = Math.max(6, Math.round(sw / (o.aspect || 1.78)));
-  lo.width = sw; lo.height = sh;
-  try { lg.drawImage(v, 0, 0, sw, sh); } catch (err) { return null; }
-  return { sw, sh };
-}
-
-function drawViz(now) {
-  requestAnimationFrame(drawViz);
-  if (document.hidden || ++vframe % 2) return;            // ~30fps is plenty
-  const t = now / 1000;
-  const S = 8;                                             // reflections are built at 1/8 size, then scaled up = soft
-  const rwid = Math.ceil(VW / S), rhei = Math.ceil(VH / S);
-  if (rc.width !== rwid || rc.height !== rhei) { rc.width = rwid; rc.height = rhei; }
-  rg.clearRect(0, 0, rwid, rhei);
-  rg.imageSmoothingEnabled = true;
-
-  const bh = VH * 0.22, floor = VH - bh;                   // bottom glass
-  const rw = VW * 0.12, wall = VW - rw;                     // right glass
-  const ordered = [...wins].sort((a, b) => (a.z || 0) - (b.z || 0));
-
-  for (const o of ordered) {
-    const f = grabFrame(o);
-    if (!f) continue;
-    const { sw, sh } = f;
-
-    // floor: mirrored upside-down, squashed, a ripple per low-res row, fading with depth
-    const rh = Math.min(bh, o.h * 0.6) / S;
-    const rows = Math.max(4, Math.round(rh));
-    const near = 0.5 + 0.5 * Math.min(1, (o.top + o.h) / VH);
-    for (let k = 0; k < rows; k++) {
-      const d = k / rows;
-      const wob = (Math.sin(t * 1.5 + d * 11 + o.left * 0.013) * (0.3 + d * 1.6)
-                 + Math.sin(t * 2.3 - d * 23) * 0.35 * d);
-      rg.globalAlpha = 0.7 * near * Math.pow(1 - d, 1.6);
-      rg.drawImage(lo, 0, sh * (1 - (k + 1) / rows), sw, sh / rows,
-                   o.left / S + wob, floor / S + k * (rh / rows), o.w / S, rh / rows + 0.6);
-    }
-
-    // wall: mirrored sideways, squashed, rippling
-    const rr = Math.min(rw, o.w * 0.5) / S;
-    const cols = Math.max(4, Math.round(rr));
-    const nearR = 0.4 + 0.6 * Math.min(1, (o.left + o.w) / VW);
-    for (let k = 0; k < cols; k++) {
-      const d = k / cols;
-      const wob = Math.sin(t * 1.3 + d * 10 + o.top * 0.017) * (0.3 + d * 1.5)
-                + Math.sin(t * 2.1 - d * 21) * 0.3 * d;
-      rg.globalAlpha = 0.6 * nearR * Math.pow(1 - d, 1.6);
-      rg.drawImage(lo, sw * (1 - (k + 1) / cols), 0, sw / cols, sh,
-                   wall / S + k * (rr / cols), o.top / S + wob, rr / cols + 0.6, o.h / S);
-    }
-  }
-  rg.globalAlpha = 1;
-
-  vg.clearRect(0, 0, VW, VH);
-  vg.imageSmoothingEnabled = true;
-  vg.imageSmoothingQuality = 'high';
-  vg.drawImage(rc, 0, 0, rwid * S, rhei * S);
-
-  // the glass itself: a fine bright edge, a faint sheen, and slow gliding glints
-  const edge = (x0, y0, x1, y1) => {
-    const g = vg.createLinearGradient(x0, y0, x1, y1);
-    g.addColorStop(0, 'rgba(255,255,255,0)');
-    g.addColorStop(0.5, 'rgba(255,255,255,.2)');
-    g.addColorStop(1, 'rgba(255,255,255,0)');
-    return g;
-  };
-  vg.fillStyle = edge(0, 0, VW, 0); vg.fillRect(0, floor, VW, 1);
-  vg.fillStyle = edge(0, 0, 0, VH); vg.fillRect(wall, 0, 1, VH);
-
-  let sheen = vg.createLinearGradient(0, floor, 0, VH);
-  sheen.addColorStop(0, 'rgba(255,255,255,.05)'); sheen.addColorStop(0.25, 'rgba(255,255,255,.012)'); sheen.addColorStop(1, 'rgba(255,255,255,0)');
-  vg.fillStyle = sheen; vg.fillRect(0, floor, VW, bh);
-  sheen = vg.createLinearGradient(wall, 0, VW, 0);
-  sheen.addColorStop(0, 'rgba(255,255,255,.045)'); sheen.addColorStop(0.3, 'rgba(255,255,255,.01)'); sheen.addColorStop(1, 'rgba(255,255,255,0)');
-  vg.fillStyle = sheen; vg.fillRect(wall, 0, rw, VH);
-
-  // glints: thin streaks that slide along each glass edge
-  const gx = ((t * 0.05) % 1.4 - 0.2) * VW, gy = ((t * 0.04 + 0.5) % 1.4 - 0.2) * VH;
-  for (const [x, y, sx, sy] of [[gx, floor, 5, 0.12], [wall, gy, 0.12, 5]]) {
-    vg.save(); vg.translate(x, y); vg.scale(sx, sy);
-    const g = vg.createRadialGradient(0, 0, 0, 0, 0, 40);
-    g.addColorStop(0, 'rgba(255,255,255,.35)'); g.addColorStop(1, 'rgba(255,255,255,0)');
-    vg.fillStyle = g; vg.fillRect(-40, -40, 80, 80);
-    vg.restore();
-  }
-}
-if (vg && lg && rg) requestAnimationFrame(drawViz);
-
 /* ================= audio lock ================= */
 let lockWin = null, actx = null, analyser = null, audEl = null, audCv = null, audRaf = 0;
 const srcNodes = new WeakMap();
@@ -1219,7 +1109,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-13-010254';
+const BUILD = '2026-11-13-010504';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
