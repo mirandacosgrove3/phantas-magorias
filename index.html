@@ -87,57 +87,60 @@
   .t.saved .txt { color: #2ee6d2; }
   .t.canceled .txt { color: #ff3b4a; }
 
-  /* ---- glass keyboard ---- */
+  /* ---- keyboard: a quiet type sheet ---- */
   #kb {
-    position: fixed; left: 50%;
-    bottom: calc(14px + env(safe-area-inset-bottom));
-    width: min(960px, calc(100vw - 24px));
-    box-sizing: border-box; padding: 12px 14px 16px;
-    border-radius: 30px; z-index: 100000;
-    background: linear-gradient(180deg, rgba(255,255,255,.15), rgba(255,255,255,.05));
-    -webkit-backdrop-filter: blur(28px) saturate(180%);
-    backdrop-filter: blur(28px) saturate(180%);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,.38), inset 0 -1px 0 rgba(255,255,255,.06),
-                0 0 0 .5px rgba(255,255,255,.22), 0 24px 70px rgba(0,0,0,.55);
-    transform: translate(-50%, 125%); opacity: 0; pointer-events: none;
-    transition: transform .46s cubic-bezier(.2,.9,.25,1.1), opacity .3s ease;
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 100000;
+    padding: 14px calc(18px + env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) calc(18px + env(safe-area-inset-left));
+    background: rgba(0,0,0,.82);
+    -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
+    border-top: .5px solid rgba(255,255,255,.28);
+    touch-action: none; overscroll-behavior: contain;
+    transform: translateY(105%); opacity: 0; pointer-events: none;
+    transition: transform .42s cubic-bezier(.2,.85,.25,1), opacity .25s ease;
+    font-weight: 100;
   }
-  #kb.open { transform: translate(-50%, 0); opacity: 1; pointer-events: auto; }
-  .kb-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-  .pill {
-    font-size: 15px; padding: 9px 20px; border-radius: 999px;
-    letter-spacing: .05em; cursor: pointer; transition: transform .1s;
+  #kb.open { transform: none; opacity: 1; pointer-events: auto; }
+  .kb-top {
+    display: flex; align-items: baseline; justify-content: space-between;
+    padding: 2px 6px 12px; margin-bottom: 8px;
+    border-bottom: .5px solid rgba(255,255,255,.12);
+    font-size: 14px; letter-spacing: .14em; text-transform: lowercase;
   }
-  .pill.down { transform: scale(.93); }
-  .kb-cancel { color: #ff3b4a; background: rgba(255,59,74,.12); box-shadow: inset 0 0 0 .5px rgba(255,59,74,.55); }
-  .kb-enter {
-    color: #00211e; font-weight: 300; background: #2ee6d2;
-    box-shadow: 0 0 22px rgba(46,230,210,.45), inset 0 1px 0 rgba(255,255,255,.65);
-  }
-  .kb-body { display: flex; gap: 12px; }
-  .kb-keys { flex: 1; display: flex; flex-direction: column; gap: 7px; }
-  .kb-row { display: flex; gap: 6px; justify-content: center; }
+  .kb-act { padding: 6px 4px; cursor: pointer; transition: opacity .12s; }
+  .kb-act.down { opacity: .45; }
+  .kb-cancel { color: #ff3b4a; }
+  .kb-add { color: rgba(255,255,255,.7); }
+  .kb-enter { color: #2ee6d2; text-shadow: 0 0 14px rgba(46,230,210,.55); }
+  .kb-body { display: flex; gap: 22px; align-items: stretch; }
+  .kb-keys { flex: 1; display: grid; grid-template-rows: repeat(5, 1fr); row-gap: 2px; }
+  .kb-row { display: flex; justify-content: space-between; }
   .k {
-    flex: 1 1 0; max-width: 66px; height: 46px;
-    display: flex; align-items: center; justify-content: center;
-    border-radius: 13px; font-size: 19px; font-weight: 200; color: #fff;
-    background: rgba(255,255,255,.07);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,.13), inset 0 0 0 .5px rgba(255,255,255,.1);
-    transition: transform .08s ease, background .12s ease, color .12s;
-    cursor: pointer;
+    flex: 1 1 0; height: 44px; display: flex; align-items: center; justify-content: center;
+    font-size: 22px; color: #fff; cursor: pointer; position: relative;
+    transition: color .1s, transform .1s;
   }
-  .k.down { transform: scale(.9); background: rgba(255,255,255,.24); }
-  .k.wide { max-width: 100px; flex-grow: 1.5; }
-  .k.space { max-width: none; flex-grow: 5; font-size: 14px; letter-spacing: .08em; color: rgba(255,255,255,.6); }
-  .k.on { background: rgba(255,111,181,.25); color: #ff6fb5; }
-  .kb-emo {
-    width: 176px; padding-left: 12px; max-height: 266px; overflow-y: auto;
-    display: grid; grid-template-columns: 1fr 1fr; gap: 6px; align-content: start;
-    border-left: .5px solid rgba(255,255,255,.12);
+  .k::after {
+    content: ""; position: absolute; left: 50%; bottom: 7px; width: 0; height: 1px;
+    background: #ff6fb5; transform: translateX(-50%); transition: width .12s;
   }
-  .kb-emo .k { max-width: none; height: 40px; font-size: 15px; }
-  #kb.open .k, #kb.open .pill { animation: kin .38s cubic-bezier(.2,.9,.3,1.15) backwards; animation-delay: calc(var(--i, 0) * 7ms + 80ms); }
-  @keyframes kin { from { opacity: 0; transform: translateY(10px) scale(.94); } }
+  .k.down { color: #ff6fb5; transform: translateY(-2px); }
+  .k.down::after { width: 14px; }
+  .k.word { font-size: 12px; letter-spacing: .14em; color: rgba(255,255,255,.55); flex-grow: 1.6; }
+  .k.space { flex-grow: 5; }
+  .k.on { color: #ff6fb5; }
+  .kb-emo { width: 330px; display: flex; flex-direction: column; border-left: .5px solid rgba(255,255,255,.12); padding-left: 18px; }
+  .emo-tabs { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px; letter-spacing: .14em; margin-bottom: 6px; }
+  .emo-tab { color: rgba(255,255,255,.45); padding: 6px 0; cursor: pointer; transition: color .15s; }
+  .emo-tab.on { color: #ff6fb5; }
+  .emo-grid { flex: 1; display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: 44px; column-gap: 10px; }
+  .emo-grid .k { justify-content: flex-start; font-size: 15px; white-space: nowrap; overflow: hidden; }
+  .emo-grid .k::after { left: 0; transform: none; }
+  #kb.open .k, #kb.open .kb-act, #kb.open .emo-tab {
+    animation: kin .34s ease backwards; animation-delay: calc(var(--i, 0) * 6ms + 60ms);
+  }
+  @keyframes kin { from { opacity: 0; transform: translateY(6px); } }
+  .emo-grid.swap .k { animation: kin .26s ease backwards; animation-delay: calc(var(--j, 0) * 22ms); }
+  @media (max-width: 760px) { .kb-emo { width: 220px; } .emo-grid { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
@@ -209,6 +212,15 @@ function render() {
     list.append(d);
   }
   syncRows();
+  // videos added from the keyboard mid-rename: keep the rename going on the rebuilt row
+  if (editing && editing.it.row) {
+    const it = editing.it;
+    const txt = mk('etxt', editing.buf);
+    it.row.className = 't editing';
+    it.row.innerHTML = '';
+    it.row.append(txt, mk('caret'), mk('eext', editing.ext));
+    editing.txt = txt; editing.cutting = false;
+  }
 }
 
 /* Long-press on empty space = add more videos */
@@ -326,30 +338,33 @@ function textRight() {
   return textRects().reduce((m, r) => Math.max(m, r.left + r.w), 0);
 }
 
-/* Untouched windows stack: a cascade down-and-to-the-left from the top-right,
-   kept clear of the title text when there's room. New ones never move old ones. */
-function placeStack(o, animate) {
+/* Untouched windows: keep the opening size, and pick the spot that overlaps other windows
+   and the title text the least (leaning toward the top-right). A little stacking is fine
+   once the screen fills up; new ones never move old ones. */
+function placeSpread(o, animate) {
   const { W, H } = view();
   const w = capWidth(o.aspect), h = w / o.aspect;
-  const STEP = 34, PER = 5;
-  const clearX = textRight() + PAD;                     // first x that's free of text
-  const roomRight = W - PAD - clearX;
   const others = wins.filter(p => p !== o);
-  for (let i = 0; i < 40; i++) {
-    const col = Math.floor(i / PER), k = i % PER;
-    let right = W - PAD - 10 - k * STEP - col * w * 0.55;
-    let top = PAD + 24 + k * STEP + col * 18;
-    // keep the stack right of the text if it fits
-    if (roomRight >= w + (PER - 1) * STEP && right - w < clearX) right = clearX + w;
-    if (top + h > H - PAD) top = Math.max(PAD, H - PAD - h - k * 6);
-    const left = Math.max(PAD, right - w);
-    const taken = others.some(p => Math.abs(p.left - left) < 12 && Math.abs(p.top - top) < 12);
-    if (taken) continue;
-    Object.assign(o, { w, h, left, top, slot: i });
-    apply(o, animate);
-    return;
+  const texts = textRects();
+  const hit = (l, t, p) => {
+    const ox = Math.max(0, Math.min(l + w, p.left + p.w) - Math.max(l, p.left));
+    const oy = Math.max(0, Math.min(t + h, p.top + p.h) - Math.max(t, p.top));
+    return ox * oy;
+  };
+  const area = w * h, diag = Math.hypot(W, H);
+  let best = null;
+  const step = 16;
+  for (let t = PAD; t <= Math.max(PAD, H - h - PAD); t += step) {
+    for (let l = PAD; l <= Math.max(PAD, W - w - PAD); l += step) {
+      let win = 0, txt = 0;
+      for (const p of others) win += hit(l, t, p);
+      for (const p of texts) txt += hit(l, t, p);
+      const lean = Math.hypot(W - PAD - (l + w), t - PAD) / diag;     // prefer top-right
+      const score = (win / area) * 1.0 + (txt / area) * 4 + lean * 0.12;
+      if (!best || score < best.score) best = { score, l, t };
+    }
   }
-  Object.assign(o, { w, h, left: W - PAD - w, top: PAD });
+  Object.assign(o, { w, h, left: best ? best.l : W - PAD - w, top: best ? best.t : PAD });
   apply(o, animate);
 }
 
@@ -387,15 +402,11 @@ function placeFree(o, ax, ay, animate) {
   apply(o, animate);
 }
 
-// After a video's real shape is known: keep its top-right corner, resize to the cap.
+// After a video's real shape is known, re-pick its spot (only if you haven't touched it).
 function relayout(o) {
   if (!o || o.adjusted) return;
-  const right = o.left + o.w;
-  const { W, H } = view();
-  o.w = capWidth(o.aspect); o.h = o.w / o.aspect;
-  o.left = Math.max(PAD, right - o.w);
-  if (o.top + o.h > H - PAD) o.top = Math.max(PAD, H - PAD - o.h);
-  apply(o, true);
+  if (anyAdjusted()) placeFree(o, o.left + o.w / 2, o.top + o.h / 2, true);
+  else placeSpread(o, true);
 }
 
 /* ================= audio focus (iOS) ================= */
@@ -493,7 +504,7 @@ function openWin(it, x, y) {
   front(o);
 
   if (anyAdjusted()) placeFree(o, x, y, false);
-  else placeStack(o, false);
+  else placeSpread(o, false);
 
   v.addEventListener('loadedmetadata', () => {
     if (!v.videoWidth) return;
@@ -758,69 +769,111 @@ const kb = document.getElementById('kb');
 const KB_ROWS = [
   ['1','2','3','4','5','6','7','8','9','0'],
   ['q','w','e','r','t','y','u','i','o','p'],
-  ['a','s','d','f','g','h','j','k','l'],
-  ['⇧','z','x','c','v','b','n','m','⌫'],
-  ['-','_','space','.',"'"]
+  ['a','s','d','f','g','h','j','k','l',"'"],
+  ['shift','z','x','c','v','b','n','m','delete'],
+  ['-','_','space','.',',']
 ];
-const EMOTES = [':)', ':(', ';)', ':D', ':P', ':/', '<3', '</3', 'xD', ':3',
-                '^_^', '-_-', 'T_T', 'o_O', '>_<', ':^)', '(:', '):', '._.', '\\o/'];
+const EMOTES = {
+  happy: ['(◕‿◕)', '(✿◠‿◠)', '(*≧ω≦)', '٩(ˊᗜˋ*)و', '(ﾉ◕ヮ◕)ﾉ*:･ﾟ✧', '(•‿•)', 'ヽ(•‿•)ノ', '(＾▽＾)'],
+  love:  ['( ˘ ³˘)♥', '(づ｡◕‿‿◕｡)づ', '(♡μ_μ)', '(っ˘ω˘ς )', '♡(˃͈ દ ˂͈ ༶ )', '(´｡• ᵕ •｡`) ♡', '( ˶ˆ꒳ˆ˵ )', '(灬º‿º灬)♡'],
+  sad:   ['(╥﹏╥)', '(｡•́︿•̀｡)', '(っ- ‸ - ς)', '( ; ω ; )', '(ಥ﹏ಥ)', '(◞‸◟)', '(-_-) zzZ', '(︶︹︺)'],
+  mad:   ['(╯°□°)╯︵ ┻━┻', '┬─┬ノ( º _ ºノ)', 'ಠ_ಠ', '(ง\'̀-\'́)ง', '(ノಠ益ಠ)ノ', '(¬_¬)', '(＃`Д´)', '(눈_눈)'],
+  shrug: ['¯\\_(ツ)_/¯', '┐(￣ヘ￣)┌', '(・_・;)', '(⊙_⊙)', '(￣ω￣;)', '(⌐■_■)', '( ͡° ͜ʖ ͡°)', '(°ロ°)'],
+  pets:  ['ʕ•ᴥ•ʔ', 'ʕ ᵔᴥᵔ ʔ', '(=^･ω･^=)', '／(=･ x ･=)＼', 'U・ᴥ・U', '(•ө•)♡', '꒰ ˶• ༝ •˶꒱', '>°)))彡'],
+  bits:  ['༼ つ ◕_◕ ༽つ', '✧･ﾟ: *✧･ﾟ:*', '☆彡', '⋆｡°✩', '(ﾟ∀ﾟ)', '(ᵔ◡ᵔ)', '→_→', '<(￣︶￣)>']
+};
+let emoCat = 'happy';
 
+/* Tap = press on release, only if the finger didn't travel (so scrolling/sliding never types).
+   repeat: fire on press and keep firing while held (delete). */
 function pressable(el, fn, repeat) {
-  let rep = null, delay = null;
+  let sx = 0, sy = 0, live = false, delay = null, rep = null;
   const stop = () => { el.classList.remove('down'); clearTimeout(delay); clearInterval(rep); };
   el.addEventListener('pointerdown', e => {
     e.preventDefault(); e.stopPropagation();
-    el.classList.add('down'); fn();
-    if (repeat) delay = setTimeout(() => { rep = setInterval(fn, 55); }, 380);
+    sx = e.clientX; sy = e.clientY; live = true;
+    el.classList.add('down');
+    if (repeat) { fn(); delay = setTimeout(() => { rep = setInterval(fn, 55); }, 380); }
   });
-  ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => el.addEventListener(t, stop));
+  el.addEventListener('pointermove', e => {
+    if (live && Math.hypot(e.clientX - sx, e.clientY - sy) > 10) { live = false; stop(); }
+  });
+  el.addEventListener('pointerup', e => {
+    e.preventDefault();
+    if (live && !repeat) fn();
+    live = false; stop();
+  });
+  ['pointercancel', 'pointerleave'].forEach(t => el.addEventListener(t, () => { live = false; stop(); }));
 }
 
 function buildKb() {
   let i = 0;
   const top = document.createElement('div'); top.className = 'kb-top';
-  const cancel = mk('pill kb-cancel', 'cancel'); cancel.style.setProperty('--i', 0);
-  const enter = mk('pill kb-enter', 'enter'); enter.style.setProperty('--i', 0);
+  const cancel = mk('kb-act kb-cancel', 'cancel');
+  const add = mk('kb-act kb-add', '+ add videos');
+  const enter = mk('kb-act kb-enter', 'enter');
+  [cancel, add, enter].forEach(el => el.style.setProperty('--i', i++));
   pressable(cancel, () => finishEdit(false));
   pressable(enter, () => finishEdit(true));
-  top.append(cancel, enter);
+  // the file picker needs a real click to open on iPad
+  add.addEventListener('pointerdown', e => { e.stopPropagation(); add.classList.add('down'); });
+  add.addEventListener('pointerup', () => add.classList.remove('down'));
+  add.addEventListener('click', e => { e.stopPropagation(); picker.click(); });
+  top.append(cancel, add, enter);
 
   const body = document.createElement('div'); body.className = 'kb-body';
   const keys = document.createElement('div'); keys.className = 'kb-keys';
   for (const row of KB_ROWS) {
     const r = document.createElement('div'); r.className = 'kb-row';
     for (const k of row) {
-      const el = mk('k', k === 'space' ? 'space' : k);
+      const el = mk('k', k);
       el.dataset.k = k;
-      if (k === '⇧' || k === '⌫') el.classList.add('wide');
+      if (k.length > 1) el.classList.add('word');
       if (k === 'space') el.classList.add('space');
       el.style.setProperty('--i', i++);
-      pressable(el, () => typeKey(k), k === '⌫');
+      pressable(el, () => typeKey(k === 'shift' ? '⇧' : k === 'delete' ? '⌫' : k), k === 'delete');
       r.append(el);
     }
     keys.append(r);
   }
+
   const emo = document.createElement('div'); emo.className = 'kb-emo';
-  for (const e of EMOTES) {
-    const el = mk('k', e);
-    el.style.setProperty('--i', i++);
-    pressable(el, () => typeKey(e));
-    emo.append(el);
+  const tabs = document.createElement('div'); tabs.className = 'emo-tabs';
+  const grid = document.createElement('div'); grid.className = 'emo-grid';
+  const fill = () => {
+    grid.innerHTML = '';
+    grid.classList.remove('swap'); void grid.offsetWidth; grid.classList.add('swap');
+    EMOTES[emoCat].forEach((e, j) => {
+      const el = mk('k', e);
+      el.style.setProperty('--j', j);
+      pressable(el, () => typeKey(e));
+      grid.append(el);
+    });
+    tabs.querySelectorAll('.emo-tab').forEach(t => t.classList.toggle('on', t.dataset.c === emoCat));
+  };
+  for (const c of Object.keys(EMOTES)) {
+    const t = mk('emo-tab', c); t.dataset.c = c;
+    t.style.setProperty('--i', i++);
+    pressable(t, () => { if (emoCat !== c) { emoCat = c; fill(); } });
+    tabs.append(t);
   }
+  emo.append(tabs, grid);
   body.append(keys, emo);
   kb.append(top, body);
+  fill();
 }
 function updateShift() {
   const on = editing && editing.shift;
   kb.querySelectorAll('.k[data-k]').forEach(el => {
     const k = el.dataset.k;
-    if (k === '⇧') el.classList.toggle('on', !!on);
+    if (k === 'shift') el.classList.toggle('on', !!on);
     else if (k.length === 1 && /[a-z]/.test(k)) el.textContent = on ? k.toUpperCase() : k;
   });
 }
 function openKb() { updateShift(); kb.classList.add('open'); kb.setAttribute('aria-hidden', 'false'); }
 function closeKb() { kb.classList.remove('open'); kb.setAttribute('aria-hidden', 'true'); }
 kb.addEventListener('pointerdown', e => e.stopPropagation());
+kb.addEventListener('touchmove', e => e.preventDefault(), { passive: false });   // never scroll the page from the keyboard
 buildKb();
 
 // Hardware keyboard while renaming
@@ -856,7 +909,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-13-000417';
+const BUILD = '2026-11-13-001205';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
