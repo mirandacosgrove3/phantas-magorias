@@ -55,13 +55,14 @@
                 0 0 22px rgba(255,111,181,.32), inset 0 0 0 .5px rgba(255,255,255,.35);
   }
   .win.lockpulse { animation: lockpulse .5s ease; }
-  @keyframes lockpulse { 40% { transform: scale(1.015); } }
+  @keyframes lockpulse { 40% { box-shadow: 0 0 0 1.5px rgba(255,170,215,.95), 0 0 0 5px rgba(255,111,181,.22), 0 0 40px rgba(255,111,181,.55); } }
   #list { position: relative; }
   .aud { position: absolute; cursor: pointer; animation: audin .32s cubic-bezier(.2,.9,.3,1.3) backwards; }
   .aud canvas { width: 100%; height: 100%; display: block; }
   .aud.out { opacity: 0; transform: scale(.5); transition: opacity .18s, transform .18s; }
   @keyframes audin { from { opacity: 0; transform: scale(.3); } }
-  .win.anim { transition: left .28s ease, top .28s ease, width .28s ease, height .28s ease; }
+  .win { left: 0; top: 0; will-change: transform; }
+  .win.anim { transition: transform .28s ease, width .28s ease, height .28s ease; }
   .win.flash { box-shadow: 0 0 0 1.5px rgba(255,255,255,.9); }
   .win video {
     width: 100%; height: 100%; display: block;
@@ -329,8 +330,7 @@ function apply(o, animate) {
   o.el.classList.toggle('anim', !!animate);
   o.el.style.width = o.w + 'px';
   o.el.style.height = o.h + 'px';
-  o.el.style.left = o.left + 'px';
-  o.el.style.top = o.top + 'px';
+  o.el.style.transform = `translate3d(${o.left}px, ${o.top}px, 0)`;
 }
 
 const anyAdjusted = () => wins.some(o => o.adjusted);
@@ -430,11 +430,11 @@ function relayout(o) {
 /* ================= audio focus (iOS) ================= */
 let audible = null;
 function giveSound(o) {
-  if (lockWin && lockWin !== o) { o.v.muted = true; return; }   // sound is locked elsewhere
+  if (lockWin && lockWin !== o) { setMuted(o, true); return; }   // sound is locked elsewhere
   audible = o;
-  if (!IOS) { o.v.muted = false; return; }
-  for (const p of wins) if (p !== o) p.v.muted = true;
-  o.v.muted = false;
+  if (!IOS) { setMuted(o, false); return; }
+  for (const p of wins) if (p !== o) setMuted(p, true);
+  setMuted(o, false);
 }
 
 /* ================= title animation ================= */
@@ -538,7 +538,7 @@ function openWin(it, x, y) {
     if (o.closed) return;
     setTimeout(() => {
       if (o.closed || !v.paused) return;
-      if (audible !== o) v.muted = true;
+      if (audible !== o) setMuted(o, true);
       v.play().catch(() => {});
     }, 60);
   });
@@ -637,7 +637,7 @@ function openWin(it, x, y) {
   function onTap() {
     // No pausing. On iPad a tap moves the sound to this window.
     if (IOS) giveSound(o);
-    else if (v.muted && !lockWin) v.muted = false;
+    else if (v.muted && !lockWin) setMuted(o, false);
     if (v.paused) v.play().catch(() => {});
   }
 }
@@ -648,6 +648,17 @@ const srcNodes = new WeakMap();
 const td = new Uint8Array(512);
 let phase = 0;
 
+// Mute/unmute instantly: the element itself, and its gain if it's routed for the sound-wave.
+function setMuted(o, m) {
+  o.v.muted = m;
+  const n = srcNodes.get(o.v);
+  if (n && actx) {
+    try {
+      n.gain.gain.cancelScheduledValues(actx.currentTime);
+      n.gain.gain.setValueAtTime(m ? 0 : 1, actx.currentTime);
+    } catch (err) { n.gain.gain.value = m ? 0 : 1; }
+  }
+}
 function ensureAudioCtx() {
   try {
     if (!actx) { const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return; actx = new AC(); }
@@ -660,8 +671,14 @@ function attachAnalyser(o) {
   analyser = null;
   if (!/^https?:$/.test(location.protocol) || !actx || actx.state !== 'running') return;
   try {
-    let src = srcNodes.get(o.v);
-    if (!src) { src = actx.createMediaElementSource(o.v); src.connect(actx.destination); srcNodes.set(o.v, src); }
+    let node = srcNodes.get(o.v);
+    if (!node) {
+      const src = actx.createMediaElementSource(o.v), gain = actx.createGain();
+      gain.gain.value = o.v.muted ? 0 : 1;
+      src.connect(gain); gain.connect(actx.destination);
+      node = { src, gain }; srcNodes.set(o.v, node);
+    }
+    const src = node.src;
     analyser = actx.createAnalyser();
     analyser.fftSize = 512; analyser.smoothingTimeConstant = 0.6;
     const sink = actx.createGain(); sink.gain.value = 0;
@@ -682,7 +699,7 @@ function setLock(o) {
   lockWin = o;
   audible = o;
   o.el.classList.add('locked');
-  for (const p of wins) p.v.muted = p !== o;
+  for (const p of wins) setMuted(p, p !== o);
   if (o.v.paused) o.v.play().catch(() => {});
   attachAnalyser(o);
   showAud();
@@ -693,7 +710,7 @@ function unlock() {
   lockWin = null;
   detachAnalyser();
   hideAud();
-  if (!IOS) for (const p of wins) p.v.muted = false;   // on desktop everything is audible again
+  if (!IOS) for (const p of wins) setMuted(p, false);   // on desktop everything is audible again
 }
 
 function showAud() {
@@ -720,20 +737,25 @@ function drawAud() {
   if (!row || !row.isConnected) { audEl.style.display = 'none'; return; }
   if (!audEl.isConnected) list.append(audEl);
   audEl.style.display = '';
-  const fs = parseFloat(getComputedStyle(row).fontSize) || 16;
-  const w = fs * 1.6, h = fs;
-  audEl.style.width = w + 'px'; audEl.style.height = h + 'px';
-  audEl.style.left = (row.offsetLeft - w - fs * 0.5) + 'px';
-  audEl.style.top = (row.offsetTop + (row.offsetHeight - h) / 2) + 'px';
-
-  let color = '#fff';
-  if (row.classList.contains('collapsed')) {
-    const ln = row.querySelector('.ln');
-    color = (ln && ln.style.getPropertyValue('--c')) || '#fff';
-  } else {
-    const t = row.querySelector('.txt, .etxt');
-    if (t) color = getComputedStyle(t).color;
+  // measuring forces layout, so only re-measure every ~12 frames
+  if (!drawAud.m || drawAud.row !== row || ++drawAud.tick % 12 === 0) {
+    const fs = parseFloat(getComputedStyle(row).fontSize) || 16;
+    const w = fs * 1.6, h = fs;
+    audEl.style.width = w + 'px'; audEl.style.height = h + 'px';
+    audEl.style.left = (row.offsetLeft - w - fs * 0.5) + 'px';
+    audEl.style.top = (row.offsetTop + (row.offsetHeight - h) / 2) + 'px';
+    let color = '#fff';
+    if (row.classList.contains('collapsed')) {
+      const ln = row.querySelector('.ln');
+      color = (ln && ln.style.getPropertyValue('--c')) || '#fff';
+    } else {
+      const t = row.querySelector('.txt, .etxt');
+      if (t) color = getComputedStyle(t).color;
+    }
+    drawAud.m = { w, h, color }; drawAud.row = row;
+    if (!drawAud.tick) drawAud.tick = 0;
   }
+  const { w, h, color } = drawAud.m;
 
   const dpr = devicePixelRatio || 1;
   const cw = Math.round(w * dpr), ch = Math.round(h * dpr);
@@ -876,8 +898,6 @@ function startEdit(it) {
   setTimeout(tick, 90);
 
   openKb();
-  const r = it.row.getBoundingClientRect();
-  window.scrollBy({ top: r.top - innerHeight * 0.26, behavior: 'smooth' });
 }
 
 function typeKey(k) {
@@ -1048,13 +1068,12 @@ function resetAll() {
   activeWin = null;
   for (const it of items) if (it.row) { it.anim = (it.anim || 0) + 1; it.row.classList.remove('active', 'collapsed'); it.txt.textContent = it.title; }
   z = 10;
-  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-13-003347';
+const BUILD = '2026-11-13-004202';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
