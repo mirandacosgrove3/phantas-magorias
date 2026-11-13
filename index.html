@@ -190,13 +190,12 @@
   .ctl.kbd svg { width: 26px; height: 26px; display: block; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
   #native { position: fixed; left: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; font-size: 16px; border: 0; padding: 0; pointer-events: none; }
 
-  /* pull-out keyboard: a window that unfolds out of the wheel's top-left corner */
+  /* full keyboard: unfolds out of the wheel's top-left corner and takes over the bottom of the screen */
   .xkb {
-    position: fixed; z-index: 99999;                       /* tucked under the wheel so the tab stays grabbable */
-    right: calc(26px + clamp(290px, 34vw, 380px) - 26px + env(safe-area-inset-right));
-    bottom: calc(26px + clamp(290px, 34vw, 380px) - 26px + env(safe-area-inset-bottom));
-    width: min(620px, calc(100vw - clamp(290px, 34vw, 380px) - 40px));
-    padding: 14px; border-radius: 22px; box-sizing: border-box;
+    position: fixed; z-index: 100001;
+    left: max(26px, calc((100vw - 1040px) / 2)); right: max(26px, calc((100vw - 1040px) / 2));
+    bottom: calc(88px + env(safe-area-inset-bottom));
+    padding: 16px 16px 18px; border-radius: 26px; box-sizing: border-box;
     background: rgba(0,0,0,.94); box-shadow: inset 0 0 0 1px rgba(255,255,255,.2), 0 24px 70px rgba(0,0,0,.6);
     transform-origin: 100% 100%;
     transform: perspective(1400px) rotateX(30deg) rotateY(-30deg) scale(.15); opacity: 0; pointer-events: none;
@@ -206,7 +205,7 @@
   .xkb.dragging { transition: none; }
   .xkb.open { pointer-events: auto; }
   .emo-strip {
-    position: relative; overflow: hidden; height: 42px; border-radius: 12px; margin-bottom: 4px;
+    position: relative; overflow: hidden; height: 48px; margin-left: 44px; border-radius: 12px; margin-bottom: 4px;
     background: rgba(255,255,255,.04); box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); cursor: grab;
     -webkit-mask: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent);
             mask: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent);
@@ -214,14 +213,22 @@
   .emo-track { position: absolute; left: 0; top: 0; height: 100%; display: flex; align-items: center; gap: 26px; padding: 0 13px; white-space: nowrap; will-change: transform; }
   .emo { font-size: 15px; font-weight: 300; color: rgba(255,255,255,.82); transition: color .1s; }
   .emo.down { color: #ff6fb5; }
-  .xrow { display: flex; justify-content: center; gap: 6px; margin-top: 6px; }
+  .xrow { display: flex; justify-content: center; gap: 8px; margin-top: 8px; }
   .xk {
-    width: calc((100% - 54px) / 10); flex: none;
-    height: 46px; border-radius: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer;
+    width: calc((100% - 72px) / 10); flex: none;
+    height: clamp(46px, 6.4vh, 60px); border-radius: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer;
     font-size: 20px; font-weight: 200; color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,.2);
     transition: color .1s, box-shadow .1s, background .1s, transform .08s;
   }
   .xrow.nums .xk { font-size: 17px; background: rgba(255,255,255,.075); box-shadow: inset 0 0 0 1px rgba(255,255,255,.14); }
+  .xk.icon { color: rgba(255,255,255,.85); }
+  .xk.icon svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+  .xk.on { color: #ff6fb5; box-shadow: inset 0 0 0 1px #ff6fb5; }
+  .xk.lock { background: rgba(255,111,181,.16); }
+  /* fold-away handle in the keyboard's top-left corner */
+  .xtab { position: absolute; left: 0; top: 0; width: 58px; height: 58px; cursor: grab; touch-action: none; }
+  .xtab svg { width: 100%; height: 100%; fill: none; stroke: rgba(255,255,255,.55); stroke-width: 2.4; stroke-linecap: round; }
+  .xtab.down svg { stroke: #ff6fb5; }
   .xk.down { color: #ff6fb5; box-shadow: inset 0 0 0 1px #ff6fb5; background: rgba(255,111,181,.09); transform: scale(.95); }
   .xkb.open .xk { animation: kin .35s ease backwards; animation-delay: calc(var(--i) * 6ms + 120ms); }
   #kb.open .kbtn { animation: kin .4s ease backwards; animation-delay: .18s; }
@@ -1256,6 +1263,7 @@ function applyCase() {
   const up = capsState !== 'off';
   capsBtn.classList.toggle('on', up);
   capsBtn.classList.toggle('lock', capsState === 'lock');
+  if (xShift) { xShift.classList.toggle('on', up); xShift.classList.toggle('lock', capsState === 'lock'); }
   xKeys.forEach(k => { if (isLetter(k.dataset.c)) k.textContent = up ? k.dataset.c.toUpperCase() : k.dataset.c; });
   if (emote) return;
   mode = up ? 1 : 0;
@@ -1313,38 +1321,63 @@ function buildKb() {
     return d + ' Z';
   };
   const onCircle = (R, ang, r = 0) => ({ x: 100 + R * Math.cos(ang), y: 100 + R * Math.sin(ang), r });
-  const arcPts = (R, from, to) => {                                 // points strictly between two angles
-    const n = Math.max(2, Math.ceil(Math.abs(to - from) / 0.05)), out = [];
-    for (let i = 1; i < n; i++) out.push(onCircle(R, from + (to - from) * i / n));
+  // points along the inner arc, leaving a margin at each end so the end corners can round fully
+  const arcPts = (R, from, to, m0 = 0, m1 = 0) => {
+    const dir = Math.sign(to - from), a = from + dir * m0 / R, b = to - dir * m1 / R;
+    const n = Math.max(2, Math.ceil(Math.abs(b - a) / 0.04)), out = [];
+    for (let i = 0; i <= n; i++) out.push(onCircle(R, a + (b - a) * i / n));
     return out;
   };
   const tips = R => { const h = Math.sqrt(R * R - 100 * 100); return { h, a1: Math.atan2(-100, h), a2: Math.atan2(-h, 100) }; };
   const wholePiece = (R, rc, rt) => {
     const { h, a1, a2 } = tips(R);
-    return roundPoly([{ x: 100 + h, y: 0, r: rt }, { x: 200, y: 0, r: rc }, { x: 200, y: 100 - h, r: rt }, ...arcPts(R, a2, a1)]);
+    return [{ x: 100 + h, y: 0, r: rt }, { x: 200, y: 0, r: rc }, { x: 200, y: 100 - h, r: rt }, ...arcPts(R, a2, a1, rt, rt)];
   };
   // the top-right piece split along its diagonal: redo (top half) and backspace (right half, nearer the hand)
   const splitPieces = (R, rc, rt, g) => {
-    const { h, a1, a2 } = tips(R), mid = -Math.PI / 4, dA = g / R, dE = g * Math.SQRT2;
-    const redo = roundPoly([{ x: 100 + h, y: 0, r: rt }, { x: 200 - dE, y: 0, r: rc * .6 },
-                            onCircle(R, mid - dA, 6), ...arcPts(R, mid - dA, a1)]);
-    const back = roundPoly([{ x: 200, y: dE, r: rc * .6 }, { x: 200, y: 100 - h, r: rt },
-                            ...arcPts(R, a2, mid + dA), onCircle(R, mid + dA, 6)]);
+    const { h, a1, a2 } = tips(R), mid = -Math.PI / 4, dA = g / R, dE = g * Math.SQRT2, rm = 8;
+    const redo = [{ x: 100 + h, y: 0, r: rt }, { x: 200 - dE, y: 0, r: rc * .7 },
+                  onCircle(R, mid - dA, rm), ...arcPts(R, mid - dA, a1, rm, rt)];
+    const back = [{ x: 200, y: dE, r: rc * .7 }, { x: 200, y: 100 - h, r: rt },
+                  ...arcPts(R, a2, mid + dA, rt, rm), onCircle(R, mid + dA, rm)];
     return { redo, back };
   };
-  const MAIN = wholePiece(109, 22, 21), SPLIT = splitPieces(109, 22, 21, 2.4);
+  // the point inside a piece farthest from its edges = where its icon sits
+  const visualCentre = pts => {
+    const inside = (x, y) => { let c = false; for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+      const a = pts[i], b = pts[j];
+      if ((a.y > y) !== (b.y > y) && x < (b.x - a.x) * (y - a.y) / (b.y - a.y) + a.x) c = !c; } return c; };
+    const segD = (x, y, a, b) => { const dx = b.x - a.x, dy = b.y - a.y, t = Math.max(0, Math.min(1, ((x - a.x) * dx + (y - a.y) * dy) / (dx * dx + dy * dy || 1)));
+      return Math.hypot(x - a.x - t * dx, y - a.y - t * dy); };
+    let best = { x: 168, y: 32, d: -1 };
+    for (let x = 136; x <= 200; x += .8) for (let y = 0; y <= 64; y += .8) {
+      if (!inside(x, y)) continue;
+      let d = Infinity;
+      for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) d = Math.min(d, segD(x, y, pts[i], pts[j]));
+      if (d > best.d) best = { x, y, d };
+    }
+    return best;
+  };
+  const MAIN = wholePiece(109, 22, 18), SPLIT = splitPieces(109, 22, 16, 2.4);
   const CORNERS = {
-    'k-del':  { d: SPLIT.back, rot: 0,   box: '136 0 64 64',   at: [80, 46] },
-    'k-redo': { d: SPLIT.redo, rot: 0,   box: '136 0 64 64',   at: [54, 20] },
-    'caps':   { d: MAIN,       rot: 90,  box: '136 136 64 64', at: [79, 79] },
-    'heart':  { d: MAIN,       rot: 180, box: '0 136 64 64',   at: [21, 79] },
-    'ext':    { d: wholePiece(121, 10, 9), rot: 270, box: '0 0 64 64', at: null }   // thin pull tab, no icon
+    'k-del':  { pts: SPLIT.back, rot: 0,   box: [136, 0] },
+    'k-redo': { pts: SPLIT.redo, rot: 0,   box: [136, 0] },
+    'caps':   { pts: MAIN,       rot: 90,  box: [136, 136] },
+    'heart':  { pts: MAIN,       rot: 180, box: [0, 136] },
+    'ext':    { pts: wholePiece(121, 12, 10), rot: 270, box: [0, 0], noIcon: true }   // thin pull tab
   };
   const icon = (cls, paths) => {
     const k = CORNERS[cls];
+    let at = '';
+    if (!k.noIcon) {
+      const c = visualCentre(k.pts), t = k.rot * Math.PI / 180;
+      const x = 100 + (c.x - 100) * Math.cos(t) - (c.y - 100) * Math.sin(t);
+      const y = 100 + (c.x - 100) * Math.sin(t) + (c.y - 100) * Math.cos(t);
+      at = `left:${((x - k.box[0]) / 64 * 100).toFixed(2)}%;top:${((y - k.box[1]) / 64 * 100).toFixed(2)}%`;
+    }
     const b = document.createElement('div'); b.className = 'kbtn ' + cls;
-    b.innerHTML = `<svg class="shape" viewBox="${k.box}" preserveAspectRatio="none"><path d="${k.d}" transform="rotate(${k.rot} 100 100)"/></svg>`
-                + (k.at ? `<svg class="ico" viewBox="0 0 24 24" style="left:${k.at[0]}%;top:${k.at[1]}%">${paths}</svg>` : '');
+    b.innerHTML = `<svg class="shape" viewBox="${k.box[0]} ${k.box[1]} 64 64" preserveAspectRatio="none"><path d="${roundPoly(k.pts)}" transform="rotate(${k.rot} 100 100)"/></svg>`
+                + (k.noIcon ? '' : `<svg class="ico" viewBox="0 0 24 24" style="${at}">${paths}</svg>`);
     return b;
   };
   const del = icon('k-del', '<path d="M9.5 6H19a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 19 18H9.5L4 12z"/><path d="M12.5 9.5l5 5M17.5 9.5l-5 5"/>');
@@ -1365,18 +1398,18 @@ function buildKb() {
     extBtn.setPointerCapture(e.pointerId);
     pull = { x: e.clientX, y: e.clientY, from: xProg, moved: 0 };
     extBtn.classList.add('down');
-    xkb.classList.add('dragging');
+    beginPull();
   });
   extBtn.addEventListener('pointermove', e => {
     if (!pull) return;
     const dx = pull.x - e.clientX, dy = pull.y - e.clientY;
     pull.moved = Math.max(pull.moved, Math.hypot(dx, dy));
-    if (pull.moved > 8) setXProg(Math.max(0, Math.min(1, pull.from + (dx + dy) / Math.SQRT2 / 260)));
+    if (pull.moved > 8) setXProg(Math.max(0, Math.min(1, pull.from + (dx + dy) / Math.SQRT2 / 320)));
   });
   const release = () => {
     if (!pull) return;
     extBtn.classList.remove('down');
-    xkb.classList.remove('dragging');
+    endPull();
     if (pull.moved <= 8) toggleXkb();
     else toggleXkb(xProg > (pull.from > .5 ? .65 : .3));
     pull = null;
@@ -1472,6 +1505,7 @@ function buildKb() {
 /* ---- pull-out keyboard (top-left corner piece) ----
    A plain grid keyboard in the same style: an idle-scrolling kaomoji strip on top
    (touch to stop it, drag to scroll, tap one to place), a number row, then a-m / n-z. */
+let xShift = null;
 let emoX = 0, emoHold = false, emoResume = 0, emoRAF = 0, emoTrack = null, emoHalf = 0;
 function buildXkb() {
   xkb = document.createElement('div'); xkb.className = 'xkb';
@@ -1507,16 +1541,46 @@ function buildXkb() {
   const rows = [[...'1234567890'], [...'qwertyuiop'], [...'asdfghjkl'], [...'zxcvbnm']];
   let i = 0;
   xKeys = [];
+  const iconKey = (svg, fn, repeat) => { const k = document.createElement('div'); k.className = 'xk icon wide'; k.innerHTML = `<svg viewBox="0 0 24 24">${svg}</svg>`; k.style.setProperty('--i', i++); pressable(k, fn, repeat); return k; };
   rows.forEach((r, ri) => {
     const row = document.createElement('div'); row.className = 'xrow' + (ri === 0 ? ' nums' : '');
+    if (ri === 3) { xShift = iconKey('<path d="M12 4.5l7 7h-3.8v4.2H8.8v-4.2H5z"/><path d="M8.8 19.5h6.4"/>', tapCaps); row.append(xShift); }
     r.forEach(ch => {
       const k = mk('xk', ch); k.dataset.c = ch; k.style.setProperty('--i', i++);
       pressable(k, () => placeChar(capsState !== 'off' && isLetter(ch) ? ch.toUpperCase() : ch, k));
       xKeys.push(k); row.append(k);
     });
+    if (ri === 3) {
+      row.append(iconKey('<path d="M18.5 9.5H9.5a4.5 4.5 0 0 0 0 9h3"/><path d="M15 6l3.5 3.5L15 13"/>', () => typeKey('↻')));
+      row.append(iconKey('<path d="M9.5 6H19a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 19 18H9.5L4 12z"/><path d="M12.5 9.5l5 5M17.5 9.5l-5 5"/>', () => typeKey('⌫'), true));
+    }
     xkb.append(row);
   });
   xkb.prepend(strip);
+
+  // handle in the top-left corner: tap, or push it back down-right, to fold the keyboard into the wheel
+  const tab = document.createElement('div'); tab.className = 'xtab';
+  tab.innerHTML = '<svg viewBox="0 0 58 58"><path d="M14 40 A 26 26 0 0 1 40 14"/></svg>';
+  let tp = null;
+  tab.addEventListener('pointerdown', e => {
+    e.preventDefault(); e.stopPropagation(); tab.setPointerCapture(e.pointerId);
+    tp = { x: e.clientX, y: e.clientY, moved: 0 }; tab.classList.add('down'); beginPull();
+  });
+  tab.addEventListener('pointermove', e => {
+    if (!tp) return;
+    const dx = e.clientX - tp.x, dy = e.clientY - tp.y;
+    tp.moved = Math.max(tp.moved, Math.hypot(dx, dy));
+    if (tp.moved > 8) setXProg(Math.max(0, Math.min(1, 1 - (dx + dy) / Math.SQRT2 / 320)));
+  });
+  const tabUp = () => {
+    if (!tp) return;
+    tab.classList.remove('down'); endPull();
+    if (tp.moved <= 8) toggleXkb(false); else toggleXkb(xProg > .7);
+    tp = null;
+  };
+  tab.addEventListener('pointerup', tabUp);
+  tab.addEventListener('pointercancel', tabUp);
+  xkb.append(tab);
   document.body.append(xkb);
 }
 function emoLoop(now) {
@@ -1526,16 +1590,27 @@ function emoLoop(now) {
   if (emoHalf) { while (emoX <= -emoHalf) emoX += emoHalf; while (emoX > 0) emoX -= emoHalf; }
   emoTrack.style.transform = `translateX(${emoX}px)`;
 }
-let xProg = 0;                                              // 0 = folded into the corner, 1 = fully open
+let xProg = 0;                                              // 0 = folded into the wheel's corner, 1 = fully open
+function placeOrigin() {
+  // unfold from the wheel's top-left corner (measured in the keyboard's own box)
+  xkb.style.transformOrigin = `${kb.offsetLeft - xkb.offsetLeft}px ${kb.offsetTop - xkb.offsetTop}px`;
+}
+function beginPull() { placeOrigin(); xkb.classList.add('dragging'); kb.style.transition = 'none'; }
+function endPull() { xkb.classList.remove('dragging'); kb.style.transition = ''; }
 function setXProg(p) {
   xProg = p;
   const q = 1 - p;
-  xkb.style.transform = `perspective(1400px) rotateX(${(q * 30).toFixed(2)}deg) rotateY(${(-q * 30).toFixed(2)}deg) scale(${(0.15 + 0.85 * p).toFixed(3)})`;
-  xkb.style.opacity = Math.min(1, p * 1.6).toFixed(3);
+  xkb.style.transform = `perspective(1600px) rotateX(${(q * 28).toFixed(2)}deg) rotateY(${(-q * 28).toFixed(2)}deg) scale(${(0.12 + 0.88 * p).toFixed(3)})`;
+  xkb.style.opacity = Math.min(1, p * 1.5).toFixed(3);
+  // the wheel gives way to the keyboard
+  kb.style.opacity = kb.classList.contains('open') ? Math.max(0, 1 - p * 1.4).toFixed(3) : '';
+  kb.style.transform = p > 0 ? `scale(${(1 - 0.12 * p).toFixed(3)})` : '';
+  kb.style.pointerEvents = p > 0.5 ? 'none' : '';
   if (p > 0 && !emoRAF) { emoHalf = 0; emoResume = 0; emoRAF = requestAnimationFrame(emoLoop); }
 }
 function toggleXkb(force) {
   const open = force === undefined ? !xkb.classList.contains('open') : force;
+  placeOrigin();
   xkb.classList.toggle('open', open);
   extBtn.classList.toggle('on', open);
   setXProg(open ? 1 : 0);
@@ -1576,6 +1651,7 @@ function closeKb() {
   kb.classList.remove('open'); kb.setAttribute('aria-hidden', 'true');
   bar.classList.remove('open');
   toggleXkb(false);
+  kb.style.opacity = kb.style.transform = kb.style.pointerEvents = '';
   if (document.activeElement === nativeIn) nativeIn.blur();
   for (const k in RINGS) cancelAnimationFrame(RINGS[k].raf);
 }
@@ -1617,7 +1693,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-13-054735';
+const BUILD = '2026-11-13-055242';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
