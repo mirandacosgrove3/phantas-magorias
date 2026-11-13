@@ -194,8 +194,8 @@
   .xkb {
     position: fixed; z-index: 100001;
     left: max(26px, calc((100vw - 1040px) / 2)); right: max(26px, calc((100vw - 1040px) / 2));
-    bottom: calc(88px + env(safe-area-inset-bottom));
-    padding: 16px 16px 18px; border-radius: 26px; box-sizing: border-box;
+    bottom: calc(26px + env(safe-area-inset-bottom));
+    padding: 16px; border-radius: 26px; box-sizing: border-box;
     background: rgba(0,0,0,.94); box-shadow: inset 0 0 0 1px rgba(255,255,255,.2), 0 24px 70px rgba(0,0,0,.6);
     transform-origin: 100% 100%;
     transform: perspective(1400px) rotateX(30deg) rotateY(-30deg) scale(.15); opacity: 0; pointer-events: none;
@@ -205,7 +205,7 @@
   .xkb.dragging { transition: none; }
   .xkb.open { pointer-events: auto; }
   .emo-strip {
-    position: relative; overflow: hidden; height: 48px; margin-left: 44px; border-radius: 12px; margin-bottom: 4px;
+    position: relative; overflow: hidden; height: 100%; flex: 8 1 0; border-radius: 12px; margin-bottom: 4px;
     background: rgba(255,255,255,.04); box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); cursor: grab;
     -webkit-mask: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent);
             mask: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent);
@@ -213,15 +213,20 @@
   .emo-track { position: absolute; left: 0; top: 0; height: 100%; display: flex; align-items: center; gap: 26px; padding: 0 13px; white-space: nowrap; will-change: transform; }
   .emo { font-size: 15px; font-weight: 300; color: rgba(255,255,255,.82); transition: color .1s; }
   .emo.down { color: #ff6fb5; }
-  .xrow { display: flex; justify-content: center; gap: 8px; margin-top: 8px; }
+  /* every row is ten equal keys wide and runs edge to edge */
+  .xrow { display: flex; gap: 8px; margin-top: 8px; }
+  .xrow.top { margin-top: 0; padding-left: 46px; height: clamp(46px, 6.4vh, 60px); }
   .xk {
-    width: calc((100% - 72px) / 10); flex: none;
+    flex: 1 1 0; min-width: 0;
     height: clamp(46px, 6.4vh, 60px); border-radius: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer;
     font-size: 20px; font-weight: 200; color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,.2);
     transition: color .1s, box-shadow .1s, background .1s, transform .08s;
   }
   .xrow.nums .xk { font-size: 17px; background: rgba(255,255,255,.075); box-shadow: inset 0 0 0 1px rgba(255,255,255,.14); }
   .xk.icon { color: rgba(255,255,255,.85); }
+  .xk.cancel { color: #ff3b4a; box-shadow: inset 0 0 0 1px rgba(255,59,74,.6); }
+  .xk.ok { color: #2ee6d2; font-weight: 300; box-shadow: inset 0 0 0 1px rgba(46,230,210,.65); text-shadow: 0 0 12px rgba(46,230,210,.5); }
+  .xk.add { color: rgba(255,255,255,.6); }
   .xk.icon svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
   .xk.on { color: #ff6fb5; box-shadow: inset 0 0 0 1px #ff6fb5; }
   .xk.lock { background: rgba(255,111,181,.16); }
@@ -1539,9 +1544,20 @@ function buildXkb() {
   strip.addEventListener('pointercancel', up);
 
   const rows = [[...'1234567890'], [...'qwertyuiop'], [...'asdfghjkl'], [...'zxcvbnm']];
+  // top row: [fold handle] kaomoji strip, + videos, cancel
+  const top = document.createElement('div'); top.className = 'xrow top';
+  const addK = document.createElement('div'); addK.className = 'xk icon add';
+  addK.innerHTML = '<svg viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10.5l5-3v9l-5-3"/><path d="M9.5 9.5v5M7 12h5"/></svg>';
+  addK.addEventListener('pointerdown', e => { e.stopPropagation(); addK.classList.add('down'); });
+  addK.addEventListener('pointerup', () => addK.classList.remove('down'));
+  addK.addEventListener('pointerleave', () => addK.classList.remove('down'));
+  addK.addEventListener('click', e => { e.stopPropagation(); picker.click(); });   // file picker needs a real click
+  const cancelK = document.createElement('div'); cancelK.className = 'xk icon cancel';
+  cancelK.innerHTML = '<svg viewBox="0 0 24 24"><path d="M7 7l10 10M17 7L7 17"/></svg>';
+  pressable(cancelK, () => finishEdit(false));
   let i = 0;
   xKeys = [];
-  const iconKey = (svg, fn, repeat) => { const k = document.createElement('div'); k.className = 'xk icon wide'; k.innerHTML = `<svg viewBox="0 0 24 24">${svg}</svg>`; k.style.setProperty('--i', i++); pressable(k, fn, repeat); return k; };
+  const iconKey = (svg, fn, repeat) => { const k = document.createElement('div'); k.className = 'xk icon'; k.innerHTML = `<svg viewBox="0 0 24 24">${svg}</svg>`; k.style.setProperty('--i', i++); pressable(k, fn, repeat); return k; };
   rows.forEach((r, ri) => {
     const row = document.createElement('div'); row.className = 'xrow' + (ri === 0 ? ' nums' : '');
     if (ri === 3) { xShift = iconKey('<path d="M12 4.5l7 7h-3.8v4.2H8.8v-4.2H5z"/><path d="M8.8 19.5h6.4"/>', tapCaps); row.append(xShift); }
@@ -1550,13 +1566,19 @@ function buildXkb() {
       pressable(k, () => placeChar(capsState !== 'off' && isLetter(ch) ? ch.toUpperCase() : ch, k));
       xKeys.push(k); row.append(k);
     });
+    if (ri === 2) {
+      const ok = mk('xk ok', 'OK'); ok.style.setProperty('--i', i++);
+      pressable(ok, () => finishEdit(true));
+      row.append(ok);
+    }
     if (ri === 3) {
       row.append(iconKey('<path d="M18.5 9.5H9.5a4.5 4.5 0 0 0 0 9h3"/><path d="M15 6l3.5 3.5L15 13"/>', () => typeKey('↻')));
       row.append(iconKey('<path d="M9.5 6H19a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 19 18H9.5L4 12z"/><path d="M12.5 9.5l5 5M17.5 9.5l-5 5"/>', () => typeKey('⌫'), true));
     }
     xkb.append(row);
   });
-  xkb.prepend(strip);
+  top.append(strip, addK, cancelK);
+  xkb.prepend(top);
 
   // handle in the top-left corner: tap, or push it back down-right, to fold the keyboard into the wheel
   const tab = document.createElement('div'); tab.className = 'xtab';
@@ -1606,6 +1628,8 @@ function setXProg(p) {
   kb.style.opacity = kb.classList.contains('open') ? Math.max(0, 1 - p * 1.4).toFixed(3) : '';
   kb.style.transform = p > 0 ? `scale(${(1 - 0.12 * p).toFixed(3)})` : '';
   kb.style.pointerEvents = p > 0.5 ? 'none' : '';
+  bar.style.opacity = bar.classList.contains('open') ? Math.max(0, 1 - p * 1.6).toFixed(3) : '';
+  bar.style.pointerEvents = p > 0.5 ? 'none' : '';
   if (p > 0 && !emoRAF) { emoHalf = 0; emoResume = 0; emoRAF = requestAnimationFrame(emoLoop); }
 }
 function toggleXkb(force) {
@@ -1652,6 +1676,7 @@ function closeKb() {
   bar.classList.remove('open');
   toggleXkb(false);
   kb.style.opacity = kb.style.transform = kb.style.pointerEvents = '';
+  bar.style.opacity = bar.style.pointerEvents = '';
   if (document.activeElement === nativeIn) nativeIn.blur();
   for (const k in RINGS) cancelAnimationFrame(RINGS[k].raf);
 }
@@ -1693,7 +1718,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-13-055242';
+const BUILD = '2026-11-13-055809';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
