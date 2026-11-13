@@ -115,6 +115,8 @@
   .dial svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
   .wedge { fill: rgba(0,0,0,.88); stroke: rgba(255,255,255,.24); stroke-width: 1; vector-effect: non-scaling-stroke; transition: fill .2s, stroke .2s; }
   .wedge.sel { fill: rgba(255,111,181,.09); stroke: #ff6fb5; }
+  .wedge.num { fill: rgba(255,255,255,.075); stroke: rgba(255,255,255,.16); }
+  .wedge.num.sel { fill: rgba(255,111,181,.14); stroke: #ff6fb5; }
   .chunk {
     position: absolute; left: 0; top: 0; pointer-events: none; white-space: nowrap;
     font-weight: 200; font-size: clamp(15px, 1.65vw, 19px); letter-spacing: .06em; color: rgba(255,255,255,.72);
@@ -122,25 +124,27 @@
     will-change: transform;
   }
   .chunk.sel { color: #ff6fb5; }
+  .chunk.num { font-size: clamp(11px, 1.15vw, 14px); letter-spacing: .04em; color: rgba(255,255,255,.6); }
+  .chunk.num.sel { color: #ff6fb5; }
   #kb.open .chunk { animation: rin .45s ease backwards; animation-delay: calc(var(--i) * 25ms + 100ms); }
   @keyframes rin { from { opacity: 0; } }
   .hub {
-    position: absolute; left: 27%; top: 27%; width: 46%; height: 46%; border-radius: 50%;
+    position: absolute; left: 32%; top: 32%; width: 36%; height: 36%; border-radius: 50%;
     background: #000; box-shadow: inset 0 0 0 1px rgba(255,255,255,.3);
     display: flex; flex-direction: column; align-items: center; justify-content: center;
   }
-  .trio { display: flex; gap: 2px; align-items: center; }
+  .trio { display: flex; gap: 0; align-items: center; }
   .trio .L {
-    min-width: 1.05em; padding: 4px 3px; text-align: center; cursor: pointer;
-    font-weight: 100; font-size: clamp(36px, 4.3vw, 52px); line-height: 1; color: #fff;
+    min-width: .72em; padding: 4px 1px; text-align: center; cursor: pointer;
+    font-weight: 100; font-size: clamp(32px, 3.7vw, 44px); line-height: 1; color: #fff;
     transition: color .1s, transform .1s;
   }
   .trio .L.down { color: #ff6fb5; transform: scale(.92); }
   .trio .L.in { animation: flipin .34s cubic-bezier(.2,.9,.3,1.25) backwards; animation-delay: calc(var(--k) * 45ms); }
   @keyframes flipin { from { opacity: 0; transform: perspective(220px) rotateX(-85deg) translateY(-8px); } }
   .trio.emo { flex-direction: column; gap: 0; }
-  .trio.emo .L { min-width: 0; padding: 5px 8px; font-size: clamp(12px, 1.3vw, 15px); font-weight: 300; }
-  .hub-mode { margin-top: 2px; padding: 6px 10px; font-size: 13px; font-weight: 300; letter-spacing: .06em; color: rgba(255,255,255,.55); cursor: pointer; display: flex; align-items: center; gap: 6px; }
+  .trio.emo .L { min-width: 0; padding: 3px 6px; font-size: clamp(10px, 1.05vw, 13px); font-weight: 300; }
+  .hub-mode { margin-top: 0; padding: 5px 8px; font-size: 12px; font-weight: 300; letter-spacing: .06em; color: rgba(255,255,255,.55); cursor: pointer; display: flex; align-items: center; gap: 6px; }
   .hub-mode::before { content: ""; width: 5px; height: 5px; border-right: 1px solid #ff6fb5; border-bottom: 1px solid #ff6fb5; transform: translateY(-2px) rotate(45deg); }
   .hub-mode.down { color: #ff6fb5; }
   /* controls live to the left of the wheel, away from the spinning hand */
@@ -976,18 +980,19 @@ function finishEdit(save) {
   if (st !== 'collapsed') typeTo(it, true);
 }
 
-/* ---- the keyboard: a chunked rotary wheel ----
-   Rounded segments around a wheel, three characters per segment (like phone keys).
-   Spin the wheel with one finger (momentum, then it settles) or tap a segment;
-   the pink segment's three characters pop up big in the centre - tap one to place it.
-   The small label under them switches abc / ABC / 123 / kaomoji. */
+/* ---- the keyboard: a two-ring chunked wheel ----
+   Outer ring: letters, three per rounded segment (like phone keys).
+   Inner ring (greyish): numbers, same idea.
+   Spin either ring with one finger (momentum, then it settles) or tap a segment;
+   the pink segment's three characters pop up in the centre - tap one to place it.
+   The small label in the centre switches abc / ABC / kaomoji for the outer ring. */
 const kb = document.getElementById('kb');
 const T = (str) => ({ label: str, items: [...str] });
 const LOWER = ['abc','def','ghi','jkl','mno','pqr','stu','vwx','yz␣','.-_',"'!?"].map(T);
+const NUMS = ['123','456','789','0.,'].map(T);
 const MODES = [
   { label: 'abc', chunks: LOWER },
   { label: 'ABC', chunks: LOWER.map(c => T(c.label.toUpperCase())) },
-  { label: '123', chunks: ['123','456','789','0.,','!?&','@#+','()/',':~*'].map(T) },
   { label: '(◕‿◕)', emote: true, chunks: [
     { label: 'joy',  items: ['(◕‿◕)', '(✿◠‿◠)', '(*≧ω≦)'] },
     { label: 'yay',  items: ['٩(ˊᗜˋ*)و', '(ﾉ◕ヮ◕)ﾉ*:･ﾟ✧', 'ヽ(•‿•)ノ'] },
@@ -1005,13 +1010,18 @@ const MODES = [
   ] }
 ];
 const SEL = -Math.PI * 3 / 4;                       // the selected segment sits up-left, facing the screen
-let mode = 0, rot = SEL, vel = 0, dialRAF = 0, selIdx = -1, dragging = false, snapTarget = null;
-let dial, svg, hub, trio, hubMode, wedges = [], labels = [];
-
 const TAU = Math.PI * 2;
 const SVGNS = 'http://www.w3.org/2000/svg';
 const wrapA = a => { a = (a + Math.PI) % TAU; if (a < 0) a += TAU; return a - Math.PI; };
-const chunks = () => MODES[mode].chunks;
+
+// ring geometry is in the SVG's 0-200 units (centre 100)
+const RINGS = {
+  outer: { rIn: 59, rOut: 98, rc: 6, gap: 2.2, lab: 78.5, cls: '',    chunks: () => MODES[mode].chunks },
+  inner: { rIn: 38.5, rOut: 56, rc: 4, gap: 1.8, lab: 47.5, cls: 'num', chunks: () => NUMS }
+};
+for (const k in RINGS) Object.assign(RINGS[k], { rot: SEL, vel: 0, snap: null, raf: 0, wedges: [], labels: [], sel: -1, drag: false });
+let mode = 0, active = 'outer';
+let dial, svg, hub, trio, hubMode;
 
 /* Tap = fire on release only if the finger didn't travel. repeat: fire on press and while held. */
 function pressable(el, fn, repeat) {
@@ -1034,16 +1044,15 @@ function pressable(el, fn, repeat) {
   ['pointercancel', 'pointerleave'].forEach(t => el.addEventListener(t, () => { live = false; stop(); }));
 }
 
-// one rounded segment, centred on angle 0 (each is rotated into place)
-function wedgePath(step) {
-  const gap = 2.2, rc = 6;                            // half-gap between segments, corner radius
-  const rIn = 52, rOut = 98;
+// one rounded segment outline, centred on angle 0 (each is rotated into place)
+function wedgePath(step, g) {
+  const { rIn, rOut, rc, gap } = g;
   const hIn = step / 2 - gap / rIn, hOut = step / 2 - gap / rOut;
   const pt = (r, a) => [100 + r * Math.cos(a), 100 + r * Math.sin(a)];
   const lerp = (p, q, t) => [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t];
   const f = p => `${p[0].toFixed(2)} ${p[1].toFixed(2)}`;
   const O0 = pt(rOut, -hOut), O1 = pt(rOut, hOut), I1 = pt(rIn, hIn), I0 = pt(rIn, -hIn);
-  const side = Math.hypot(O1[0] - I1[0], O1[1] - I1[1]), t = rc / side;
+  const t = rc / Math.hypot(O1[0] - I1[0], O1[1] - I1[1]);
   return [
     `M ${f(pt(rOut, -hOut + rc / rOut))}`,
     `A ${rOut} ${rOut} 0 0 1 ${f(pt(rOut, hOut - rc / rOut))}`,
@@ -1058,43 +1067,49 @@ function wedgePath(step) {
   ].join(' ');
 }
 
-function buildWheel() {
-  wedges.forEach(w => w.remove()); labels.forEach(l => l.remove());
-  const N = chunks().length, step = TAU / N, d = wedgePath(step);
-  wedges = chunks().map(() => {
+function buildRing(key) {
+  const g = RINGS[key];
+  g.wedges.forEach(w => w.remove()); g.labels.forEach(l => l.remove());
+  const list_ = g.chunks(), N = list_.length, step = TAU / N, d = wedgePath(step, g);
+  g.wedges = list_.map(() => {
     const p = document.createElementNS(SVGNS, 'path');
-    p.setAttribute('d', d); p.setAttribute('class', 'wedge');
+    p.setAttribute('d', d); p.setAttribute('class', ('wedge ' + g.cls).trim());
     svg.append(p); return p;
   });
-  labels = chunks().map((ch, i) => {
-    const el = mk('chunk', ch.label);
+  g.labels = list_.map((ch, i) => {
+    const el = mk(('chunk ' + g.cls).trim(), ch.label);
     el.style.setProperty('--i', i);
     dial.insertBefore(el, hub);
     return el;
   });
-  selIdx = -1;
+  g.sel = -1;
 }
 
-function drawDial() {
-  const D = kb.clientWidth, c = D / 2, N = wedges.length, step = TAU / N;
-  const rLab = c * 0.745;
+function drawRing(key) {
+  const g = RINGS[key], D = kb.clientWidth, c = D / 2, N = g.wedges.length, step = TAU / N, u = D / 200;
+  const lift = key === 'outer' ? 2.5 : 1.5;
   for (let i = 0; i < N; i++) {
-    const a = rot + i * step, d = wrapA(a - SEL);
-    const m = Math.exp(-((d / (step * 0.6)) ** 2));                    // the selected segment lifts outward a little
-    wedges[i].setAttribute('transform', `rotate(${(a * 180 / Math.PI).toFixed(3)} 100 100) translate(${(2.5 * m).toFixed(2)} 0)`);
-    const r = rLab + 2.5 * m * D / 200;
-    labels[i].style.transform = `translate(${c + r * Math.cos(a)}px, ${c + r * Math.sin(a)}px) translate(-50%, -50%) scale(${1 + 0.06 * m})`;
+    const a = g.rot + i * step, d = wrapA(a - SEL);
+    const m = key === active ? Math.exp(-((d / (step * 0.6)) ** 2)) : 0;     // the selected segment lifts outward a little
+    g.wedges[i].setAttribute('transform', `rotate(${(a * 180 / Math.PI).toFixed(3)} 100 100) translate(${(lift * m).toFixed(2)} 0)`);
+    const r = (g.lab + lift * m) * u;
+    g.labels[i].style.transform = `translate(${c + r * Math.cos(a)}px, ${c + r * Math.sin(a)}px) translate(-50%, -50%)`;
   }
-  const idx = ((Math.round((SEL - rot) / step) % N) + N) % N;
-  if (idx !== selIdx) { selIdx = idx; showSel(); }
+  const idx = ((Math.round((SEL - g.rot) / step) % N) + N) % N;
+  if (idx !== g.sel) { g.sel = idx; if (key === active) showSel(); }
 }
 
 function showSel() {
-  wedges.forEach((w, i) => w.classList.toggle('sel', i === selIdx));
-  labels.forEach((l, i) => l.classList.toggle('sel', i === selIdx));
-  const ch = chunks()[selIdx];
+  for (const k in RINGS) {
+    const g = RINGS[k], on = k === active;
+    g.wedges.forEach((w, i) => w.classList.toggle('sel', on && i === g.sel));
+    g.labels.forEach((l, i) => l.classList.toggle('sel', on && i === g.sel));
+  }
+  const g = RINGS[active];
+  if (g.sel < 0) return;
+  const ch = g.chunks()[g.sel];
   trio.innerHTML = '';
-  trio.classList.toggle('emo', !!MODES[mode].emote);
+  trio.classList.toggle('emo', active === 'outer' && !!MODES[mode].emote);
   ch.items.forEach((it, k) => {
     const L = mk('L in', it);
     L.style.setProperty('--k', k);
@@ -1103,28 +1118,36 @@ function showSel() {
   });
 }
 
-function spin() {
-  cancelAnimationFrame(dialRAF);
-  const step = TAU / wedges.length;
+function setActive(key) {
+  if (active === key) return;
+  active = key;
+  showSel();
+  for (const k in RINGS) drawRing(k);
+}
+
+function spin(key) {
+  const g = RINGS[key];
+  cancelAnimationFrame(g.raf);
+  const step = TAU / g.wedges.length;
   const tick = () => {
-    if (dragging) { drawDial(); dialRAF = requestAnimationFrame(tick); return; }
-    if (snapTarget === null && Math.abs(vel) > 0.003) {          // momentum
-      rot += vel; vel *= 0.92;
-      drawDial(); dialRAF = requestAnimationFrame(tick); return;
+    if (g.drag) { drawRing(key); g.raf = requestAnimationFrame(tick); return; }
+    if (g.snap === null && Math.abs(g.vel) > 0.003) {            // momentum
+      g.rot += g.vel; g.vel *= 0.92;
+      drawRing(key); g.raf = requestAnimationFrame(tick); return;
     }
-    let target = snapTarget;
-    if (target === null) target = SEL - Math.round((SEL - rot) / step) * step;
-    const diff = target - rot;
-    if (Math.abs(diff) > 0.0008) { rot += diff * 0.2; drawDial(); dialRAF = requestAnimationFrame(tick); }
-    else { rot = target; snapTarget = null; vel = 0; drawDial(); }
+    let target = g.snap;
+    if (target === null) target = SEL - Math.round((SEL - g.rot) / step) * step;
+    const diff = target - g.rot;
+    if (Math.abs(diff) > 0.0008) { g.rot += diff * 0.2; drawRing(key); g.raf = requestAnimationFrame(tick); }
+    else { g.rot = target; g.snap = null; g.vel = 0; drawRing(key); }
   };
   tick();
 }
-function spinTo(i) {
-  const step = TAU / wedges.length;
+function spinTo(key, i) {
+  const g = RINGS[key], step = TAU / g.wedges.length;
   let target = SEL - i * step;
-  target += TAU * Math.round((rot - target) / TAU);              // shortest way round
-  snapTarget = target; vel = 0; spin();
+  target += TAU * Math.round((g.rot - target) / TAU);          // shortest way round
+  g.snap = target; g.vel = 0; spin(key);
 }
 
 function placeChar(it, fromEl) {
@@ -1136,7 +1159,7 @@ function placeChar(it, fromEl) {
     const f = mk('fly', it);
     const fx = from.left + from.width / 2, fy = from.top + from.height / 2;
     f.style.left = fx + 'px'; f.style.top = fy + 'px';
-    if (MODES[mode].emote) f.style.fontSize = '16px';
+    if (active === 'outer' && MODES[mode].emote) f.style.fontSize = '16px';
     document.body.append(f);
     requestAnimationFrame(() => requestAnimationFrame(() => {
       f.style.transform = `translate(${to.left - fx}px, ${to.top + to.height / 2 - fy}px) translate(-50%, -50%) scale(.4)`;
@@ -1149,8 +1172,11 @@ function placeChar(it, fromEl) {
 function setMode(next) {
   mode = (next + MODES.length) % MODES.length;
   hubMode.textContent = MODES[mode].label;
-  buildWheel();
-  rot = SEL + 0.9; snapTarget = SEL; spin();                     // new set swirls into place
+  buildRing('outer');
+  active = 'outer';
+  const g = RINGS.outer;
+  g.rot = SEL + 0.9; g.snap = SEL; spin('outer');               // new set swirls into place
+  drawRing('inner');
 }
 
 function buildKb() {
@@ -1179,59 +1205,74 @@ function buildKb() {
   pressable(hubMode, () => setMode(mode + 1));
 
   kb.append(dial, bar);
-  buildWheel();
+  buildRing('inner'); buildRing('outer');
 
-  // one-finger spinning; a still tap on a segment spins to it
-  let lastA = 0, lastT = 0, moved = 0, downA = 0;
-  const angleAt = e => {
+  // one-finger spinning of whichever ring you touch; a still tap on a segment spins to it
+  let key = 'outer', lastA = 0, lastT = 0, moved = 0, downA = 0;
+  const polar = e => {
     const r = dial.getBoundingClientRect();
-    return Math.atan2(e.clientY - (r.top + r.height / 2), e.clientX - (r.left + r.width / 2));
+    const x = e.clientX - (r.left + r.width / 2), y = e.clientY - (r.top + r.height / 2);
+    return { a: Math.atan2(y, x), u: Math.hypot(x, y) / r.width * 200 };
   };
   dial.addEventListener('pointerdown', e => {
     if (e.target.closest('.hub')) return;
     e.preventDefault(); e.stopPropagation();
+    const p = polar(e);
+    key = p.u < (RINGS.inner.rOut + RINGS.outer.rIn) / 2 ? 'inner' : 'outer';
+    setActive(key);
+    const g = RINGS[key];
     dial.setPointerCapture(e.pointerId);
-    dragging = true; moved = 0; vel = 0; snapTarget = null;
-    lastA = downA = angleAt(e); lastT = performance.now();
-    spin();
+    g.drag = true; g.vel = 0; g.snap = null; moved = 0;
+    lastA = downA = p.a; lastT = performance.now();
+    spin(key);
   });
   dial.addEventListener('pointermove', e => {
-    if (!dragging) return;
-    const a = angleAt(e), d = wrapA(a - lastA), now = performance.now();
-    rot += d; moved += Math.abs(d);
-    vel = Math.max(-0.3, Math.min(0.3, d / Math.max(1, (now - lastT) / 16.7)));
+    const g = RINGS[key];
+    if (!g.drag) return;
+    const a = polar(e).a, d = wrapA(a - lastA), now = performance.now();
+    g.rot += d; moved += Math.abs(d);
+    g.vel = Math.max(-0.3, Math.min(0.3, d / Math.max(1, (now - lastT) / 16.7)));
     lastA = a; lastT = now;
   });
   const up = () => {
-    if (!dragging) return;
-    dragging = false;
+    const g = RINGS[key];
+    if (!g.drag) return;
+    g.drag = false;
     if (moved < 0.05) {
-      vel = 0;
-      const N = wedges.length, step = TAU / N;
-      spinTo(((Math.round((downA - rot) / step) % N) + N) % N);
+      g.vel = 0;
+      const N = g.wedges.length, step = TAU / N;
+      spinTo(key, ((Math.round((downA - g.rot) / step) % N) + N) % N);
       return;
     }
-    if (performance.now() - lastT > 80) vel = 0;                 // finger stopped before lifting
-    spin();
+    if (performance.now() - lastT > 80) g.vel = 0;               // finger stopped before lifting
+    spin(key);
   };
   dial.addEventListener('pointerup', up);
   dial.addEventListener('pointercancel', up);
-  // trackpad / mouse wheel on a Mac
+  // trackpad / mouse wheel on a Mac spins the ring under the pointer
   dial.addEventListener('wheel', e => {
     e.preventDefault();
-    rot -= (e.deltaY + e.deltaX) * 0.003; vel = 0; snapTarget = null;
-    clearTimeout(dial._w); drawDial();
-    dial._w = setTimeout(spin, 120);
+    const k = polar(e).u < (RINGS.inner.rOut + RINGS.outer.rIn) / 2 ? 'inner' : 'outer';
+    setActive(k);
+    const g = RINGS[k];
+    g.rot -= (e.deltaY + e.deltaX) * 0.003; g.vel = 0; g.snap = null;
+    clearTimeout(dial._w); drawRing(k);
+    dial._w = setTimeout(() => spin(k), 120);
   }, { passive: false });
-  addEventListener('resize', () => { if (kb.classList.contains('open')) drawDial(); });
+  addEventListener('resize', () => { if (kb.classList.contains('open')) { drawRing('inner'); drawRing('outer'); } });
 }
 function updateShift() {}
 function openKb() {
   kb.classList.add('open'); kb.setAttribute('aria-hidden', 'false');
-  buildWheel();                                                  // replays the label fade-in
-  rot = SEL + 1.2; vel = 0; snapTarget = SEL; spin();            // wheel swirls into place
+  buildRing('inner'); buildRing('outer');                       // replays the label fade-in
+  active = 'outer';
+  RINGS.outer.rot = SEL + 1.2; RINGS.outer.snap = SEL; spin('outer');
+  RINGS.inner.rot = SEL - 1.0; RINGS.inner.snap = SEL; spin('inner');   // rings swirl in opposite ways
 }
-function closeKb() { kb.classList.remove('open'); kb.setAttribute('aria-hidden', 'true'); cancelAnimationFrame(dialRAF); }
+function closeKb() {
+  kb.classList.remove('open'); kb.setAttribute('aria-hidden', 'true');
+  for (const k in RINGS) cancelAnimationFrame(RINGS[k].raf);
+}
 kb.addEventListener('pointerdown', e => e.stopPropagation());
 kb.addEventListener('touchmove', e => e.preventDefault(), { passive: false });   // never scroll the page from the keyboard
 buildKb();
@@ -1269,7 +1310,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-13-050358';
+const BUILD = '2026-11-13-051104';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
