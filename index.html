@@ -1118,7 +1118,7 @@ function showSel() {
   });
 }
 
-function setActive(key) {
+function setRingActive(key) {
   if (active === key) return;
   active = key;
   showSel();
@@ -1219,7 +1219,7 @@ function buildKb() {
     e.preventDefault(); e.stopPropagation();
     const p = polar(e);
     key = p.u < (RINGS.inner.rOut + RINGS.outer.rIn) / 2 ? 'inner' : 'outer';
-    setActive(key);
+    setRingActive(key);
     const g = RINGS[key];
     dial.setPointerCapture(e.pointerId);
     g.drag = true; g.vel = 0; g.snap = null; moved = 0;
@@ -1253,7 +1253,7 @@ function buildKb() {
   dial.addEventListener('wheel', e => {
     e.preventDefault();
     const k = polar(e).u < (RINGS.inner.rOut + RINGS.outer.rIn) / 2 ? 'inner' : 'outer';
-    setActive(k);
+    setRingActive(k);
     const g = RINGS[k];
     g.rot -= (e.deltaY + e.deltaX) * 0.003; g.vel = 0; g.snap = null;
     clearTimeout(dial._w); drawRing(k);
@@ -1310,7 +1310,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-13-051104';
+const BUILD = '2026-11-13-051150';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
