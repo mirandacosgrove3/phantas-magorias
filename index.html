@@ -50,6 +50,17 @@
     touch-action: none;
     box-shadow: 0 0 0 .5px rgba(255,255,255,.35);
   }
+  .win.locked {
+    box-shadow: 0 0 0 1px rgba(255,150,205,.8), 0 0 0 3.5px rgba(255,111,181,.14),
+                0 0 22px rgba(255,111,181,.32), inset 0 0 0 .5px rgba(255,255,255,.35);
+  }
+  .win.lockpulse { animation: lockpulse .5s ease; }
+  @keyframes lockpulse { 40% { transform: scale(1.015); } }
+  #list { position: relative; }
+  .aud { position: absolute; cursor: pointer; animation: audin .32s cubic-bezier(.2,.9,.3,1.3) backwards; }
+  .aud canvas { width: 100%; height: 100%; display: block; }
+  .aud.out { opacity: 0; transform: scale(.5); transition: opacity .18s, transform .18s; }
+  @keyframes audin { from { opacity: 0; transform: scale(.3); } }
   .win.anim { transition: left .28s ease, top .28s ease, width .28s ease, height .28s ease; }
   .win.flash { box-shadow: 0 0 0 1.5px rgba(255,255,255,.9); }
   .win video {
@@ -419,6 +430,7 @@ function relayout(o) {
 /* ================= audio focus (iOS) ================= */
 let audible = null;
 function giveSound(o) {
+  if (lockWin && lockWin !== o) { o.v.muted = true; return; }   // sound is locked elsewhere
   audible = o;
   if (!IOS) { o.v.muted = false; return; }
   for (const p of wins) if (p !== o) p.v.muted = true;
@@ -464,6 +476,7 @@ function setActive(o) {
 function front(o) { o.el.style.zIndex = ++z; o.z = z; setActive(o); }
 
 function closeWin(o) {
+  if (lockWin === o) unlock();
   o.closed = true;
   o.v.pause(); o.v.removeAttribute('src'); o.v.load();
   o.el.remove();
@@ -581,6 +594,12 @@ function openWin(it, x, y) {
     const wasMoved = start && start.moved;
     snapshot();
     if (wasMoved || pts.size > 1) start.moved = true;
+    ensureAudioCtx();
+    clearTimeout(o.holdT);
+    // hold still on a window = lock the sound to it
+    if (pts.size === 1) o.holdT = setTimeout(() => {
+      if (start && !start.moved && pts.size === 1) { start.moved = true; setLock(o); }
+    }, 520);
   });
   el.addEventListener('pointermove', e => {
     if (!pts.has(e.pointerId)) return;
@@ -602,6 +621,7 @@ function openWin(it, x, y) {
     }
   });
   const end = e => {
+    clearTimeout(o.holdT);
     if (!pts.has(e.pointerId)) return;
     pts.delete(e.pointerId);
     if (pts.size === 0) {
@@ -617,9 +637,126 @@ function openWin(it, x, y) {
   function onTap() {
     // No pausing. On iPad a tap moves the sound to this window.
     if (IOS) giveSound(o);
-    else if (v.muted) v.muted = false;
+    else if (v.muted && !lockWin) v.muted = false;
     if (v.paused) v.play().catch(() => {});
   }
+}
+
+/* ================= audio lock ================= */
+let lockWin = null, actx = null, analyser = null, audEl = null, audCv = null, audRaf = 0;
+const srcNodes = new WeakMap();
+const td = new Uint8Array(512);
+let phase = 0;
+
+function ensureAudioCtx() {
+  try {
+    if (!actx) { const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return; actx = new AC(); }
+    if (actx.state === 'suspended') actx.resume();
+  } catch (err) {}
+}
+// Live waveform needs the page served over http(s) with a running audio context;
+// otherwise the indicator still animates, just not from the real sound.
+function attachAnalyser(o) {
+  analyser = null;
+  if (!/^https?:$/.test(location.protocol) || !actx || actx.state !== 'running') return;
+  try {
+    let src = srcNodes.get(o.v);
+    if (!src) { src = actx.createMediaElementSource(o.v); src.connect(actx.destination); srcNodes.set(o.v, src); }
+    analyser = actx.createAnalyser();
+    analyser.fftSize = 512; analyser.smoothingTimeConstant = 0.6;
+    const sink = actx.createGain(); sink.gain.value = 0;
+    src.connect(analyser); analyser.connect(sink); sink.connect(actx.destination);
+    analyser._src = src;
+  } catch (err) { analyser = null; }
+}
+function detachAnalyser() {
+  try { if (analyser && analyser._src) analyser._src.disconnect(analyser); } catch (err) {}
+  analyser = null;
+}
+
+function setLock(o) {
+  o.el.classList.remove('lockpulse'); void o.el.offsetWidth; o.el.classList.add('lockpulse');
+  if (navigator.vibrate) try { navigator.vibrate(10); } catch (err) {}
+  if (lockWin === o) return;
+  if (lockWin) { lockWin.el.classList.remove('locked'); detachAnalyser(); }
+  lockWin = o;
+  audible = o;
+  o.el.classList.add('locked');
+  for (const p of wins) p.v.muted = p !== o;
+  if (o.v.paused) o.v.play().catch(() => {});
+  attachAnalyser(o);
+  showAud();
+}
+function unlock() {
+  if (!lockWin) return;
+  lockWin.el.classList.remove('locked');
+  lockWin = null;
+  detachAnalyser();
+  hideAud();
+  if (!IOS) for (const p of wins) p.v.muted = false;   // on desktop everything is audible again
+}
+
+function showAud() {
+  if (audEl) { audEl.remove(); cancelAnimationFrame(audRaf); }
+  audEl = document.createElement('div'); audEl.className = 'aud';
+  audCv = document.createElement('canvas'); audEl.append(audCv);
+  audEl.addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); });
+  audEl.addEventListener('click', e => { e.stopPropagation(); unlock(); });
+  list.append(audEl);
+  const loop = () => { audRaf = requestAnimationFrame(loop); drawAud(); };
+  loop();
+}
+function hideAud() {
+  cancelAnimationFrame(audRaf);
+  if (audEl) { const el = audEl; el.classList.add('out'); setTimeout(() => el.remove(), 200); }
+  audEl = null;
+}
+
+// Sound-wave graphic, left of the locked video's title: same height as the text,
+// same width as the collapse line, same colour as that title's line.
+function drawAud() {
+  if (!lockWin || !audEl) return;
+  const row = lockWin.it.row;
+  if (!row || !row.isConnected) { audEl.style.display = 'none'; return; }
+  if (!audEl.isConnected) list.append(audEl);
+  audEl.style.display = '';
+  const fs = parseFloat(getComputedStyle(row).fontSize) || 16;
+  const w = fs * 1.6, h = fs;
+  audEl.style.width = w + 'px'; audEl.style.height = h + 'px';
+  audEl.style.left = (row.offsetLeft - w - fs * 0.5) + 'px';
+  audEl.style.top = (row.offsetTop + (row.offsetHeight - h) / 2) + 'px';
+
+  let color = '#fff';
+  if (row.classList.contains('collapsed')) {
+    const ln = row.querySelector('.ln');
+    color = (ln && ln.style.getPropertyValue('--c')) || '#fff';
+  } else {
+    const t = row.querySelector('.txt, .etxt');
+    if (t) color = getComputedStyle(t).color;
+  }
+
+  const dpr = devicePixelRatio || 1;
+  const cw = Math.round(w * dpr), ch = Math.round(h * dpr);
+  if (audCv.width !== cw || audCv.height !== ch) { audCv.width = cw; audCv.height = ch; }
+  const g = audCv.getContext('2d');
+  if (!g) return;
+  g.clearRect(0, 0, cw, ch);
+  g.strokeStyle = color; g.lineWidth = Math.max(1, dpr * 0.9);
+  g.shadowColor = color; g.shadowBlur = 4 * dpr;
+  g.lineJoin = 'round'; g.lineCap = 'round';
+  if (analyser) analyser.getByteTimeDomainData(td);
+  phase += 0.05;
+  g.beginPath();
+  const N = 48;
+  for (let i = 0; i <= N; i++) {
+    const f = i / N;
+    const idle = Math.sin(f * Math.PI * 4 + phase) * 0.12;                 // always a little alive
+    const live = analyser ? Math.max(-1, Math.min(1, (td[Math.floor(f * (td.length - 1))] - 128) / 128 * 2.4)) : Math.sin(f * Math.PI * 6 - phase * 1.7) * 0.18;
+    const env = Math.sin(f * Math.PI);                                      // taper the ends
+    const y = ch / 2 + (live + idle) * env * (ch / 2 - g.lineWidth * 2);
+    i ? g.lineTo(f * cw, y) : g.moveTo(f * cw, y);
+  }
+  g.stroke();
 }
 
 /* ================= empty-space taps: 2 fingers = reset, 3 fingers = fullscreen (or the F key) ================= */
@@ -904,6 +1041,7 @@ document.addEventListener('keydown', e => {
 });
 function resetAll() {
   if (editing) return;
+  unlock();
   [...wins].forEach(o => { o.closed = true; o.v.pause(); o.v.removeAttribute('src'); o.v.load(); o.el.remove(); });
   wins.length = 0;
   audible = null;
@@ -916,7 +1054,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-13-002111';
+const BUILD = '2026-11-13-003347';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
