@@ -100,77 +100,71 @@
   .t.saved .txt { color: #2ee6d2; }
   .t.canceled .txt { color: #ff3b4a; }
 
-  /* ---- keyboard: a glass rotary dial in the bottom-right ---- */
+  /* ---- keyboard: a precise rotary speller, bottom-right ---- */
   #kb {
     position: fixed; z-index: 100000;
-    right: calc(26px + env(safe-area-inset-right));
+    right: calc(64px + env(safe-area-inset-right));
     bottom: calc(26px + env(safe-area-inset-bottom));
-    width: clamp(270px, 33vw, 370px); aspect-ratio: 1 / 1;
+    width: clamp(280px, 32vw, 360px); aspect-ratio: 1 / 1;
     touch-action: none; pointer-events: none; opacity: 0;
-    transform: translate(40px, 40px) scale(.8); transform-origin: 100% 100%;
-    transition: transform .55s cubic-bezier(.2,.9,.25,1.12), opacity .3s ease;
-    font-weight: 100;
+    transform: scale(.92) rotate(-8deg); transform-origin: 50% 50%;
+    transition: transform .5s cubic-bezier(.2,.9,.25,1.05), opacity .25s ease;
   }
   #kb.open { opacity: 1; transform: none; pointer-events: auto; }
-  .dial {
-    position: absolute; inset: 0; border-radius: 50%; cursor: grab;
-    background: radial-gradient(circle at 34% 28%, rgba(255,255,255,.09), rgba(255,255,255,.015) 46%, rgba(0,0,0,.4) 100%);
-    -webkit-backdrop-filter: blur(16px) saturate(150%); backdrop-filter: blur(16px) saturate(150%);
-    box-shadow: inset 0 0 0 .5px rgba(255,255,255,.3), inset 0 1px 1px rgba(255,255,255,.2), 0 20px 70px rgba(0,0,0,.65);
+  .dial { position: absolute; inset: 0; border-radius: 50%; cursor: grab; background: #000; }
+  .track { position: absolute; border-radius: 50%; pointer-events: none; }
+  .track.t1 { inset: 21%; box-shadow: inset 0 0 0 1px rgba(255,255,255,.22); }
+  .track.t2 { inset: 0; box-shadow: inset 0 0 0 1px rgba(255,255,255,.1); }
+  .beam {
+    position: absolute; left: 50%; top: 50%; height: 16px; margin-top: -8px;
+    transform-origin: 0 50%; pointer-events: none;
+    background: linear-gradient(90deg, rgba(255,40,140,0) 0%, rgba(255,40,140,.95) 42%, rgba(255,40,140,.35) 78%, rgba(255,40,140,0) 100%);
+    -webkit-mask: linear-gradient(180deg, transparent, #000 30%, #000 70%, transparent);
+            mask: linear-gradient(180deg, transparent, #000 30%, #000 70%, transparent);
   }
-  .dial::before { content: ""; position: absolute; inset: 18%; border-radius: 50%; box-shadow: inset 0 0 0 .5px rgba(255,255,255,.14); pointer-events: none; }
-  .wedge {
-    position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
-    background: conic-gradient(from 297deg, rgba(255,111,181,0) 0deg, rgba(255,111,181,.42) 18deg, rgba(255,111,181,0) 36deg, transparent 36deg);
-    -webkit-mask: radial-gradient(circle, transparent 20%, #000 30%, #000 60%, transparent 78%);
-            mask: radial-gradient(circle, transparent 20%, #000 30%, #000 60%, transparent 78%);
-  }
+  .tick { position: absolute; width: 2px; height: 16px; background: #ff3d9a; transform-origin: 50% 50%; pointer-events: none; box-shadow: 0 0 6px rgba(255,61,154,.8); }
   .ri {
     position: absolute; left: 0; top: 0; pointer-events: auto;
-    font-size: clamp(14px, 1.55vw, 19px); font-weight: 200; color: #fff; white-space: nowrap;
+    font-size: clamp(15px, 1.6vw, 19px); font-weight: 300; color: #fff; white-space: nowrap;
     will-change: transform, opacity;
   }
-  #kb.open .ri { animation: rin .5s ease backwards; animation-delay: calc(var(--i) * 9ms + 120ms); }
+  .ri.sel { color: #ff3d9a; font-weight: 400; }
+  .hub { position: absolute; left: 29%; top: 29%; width: 42%; height: 42%; border-radius: 50%; cursor: pointer; }
+  .hub .rim { position: absolute; inset: 0; border-radius: 50%; box-shadow: inset 0 0 0 1.5px #fff; pointer-events: none; }
+  .hub .rim2 { position: absolute; inset: 0; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(255,255,255,.4); transform: translate(-5px, -4px); pointer-events: none; }
+  .hub .glow {
+    position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
+    background: conic-gradient(from var(--a, 275deg), rgba(255,40,140,0) 0deg, rgba(255,40,140,.55) 40deg, rgba(255,40,140,0) 80deg, transparent 80deg);
+    -webkit-mask: radial-gradient(circle, transparent 38%, #000 70%); mask: radial-gradient(circle, transparent 38%, #000 70%);
+  }
+  .hub .face { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .hub.down .rim { box-shadow: inset 0 0 0 1.5px #ff3d9a; }
+  .hub.pop .rim { animation: rimpop .3s ease; }
+  @keyframes rimpop { 30% { box-shadow: inset 0 0 0 2.5px #ff3d9a, 0 0 18px rgba(255,61,154,.6); } }
+  .hub-char { font-size: clamp(50px, 6.2vw, 72px); line-height: 1; font-weight: 300; color: #fff; }
+  .hub-char.tick2 { animation: htick .2s ease; }
+  @keyframes htick { from { opacity: .2; transform: translateY(4px); } }
+  .hub-char.long { font-size: clamp(13px, 1.4vw, 17px); white-space: nowrap; font-weight: 400; }
+  .hub-mode { margin-top: 6px; padding: 6px 10px; font-size: 15px; font-weight: 300; color: rgba(255,255,255,.75); display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  .hub-mode::before { content: ""; width: 6px; height: 6px; border-right: 1.5px solid #ff3d9a; border-bottom: 1.5px solid #ff3d9a; transform: translateY(-2px) rotate(45deg); }
+  .stack { position: absolute; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; transform: translateY(-50%); }
+  .ctl { position: relative; padding: 5px 8px 5px 14px; font-size: 14px; font-weight: 400; letter-spacing: .02em; color: #fff; cursor: pointer; white-space: nowrap; transition: opacity .1s; }
+  .ctl.down { opacity: .45; }
+  .ctl::before { content: ""; position: absolute; left: 0; top: 7px; bottom: 7px; width: 2px; background: rgba(255,255,255,.25); }
+  .ctl.enter { color: #2ee6d2; }
+  .ctl.enter::before { background: #2ee6d2; box-shadow: 0 0 8px rgba(46,230,210,.8); }
+  .ctl.cancel { color: #ff3b4a; }
+  .ctl.cancel::before { background: #ff3b4a; }
+  .ctl.add { color: rgba(255,255,255,.6); }
+  #kb.open .ri { animation: rin .45s ease backwards; animation-delay: calc(var(--i) * 8ms + 80ms); }
   @keyframes rin { from { opacity: 0; } }
-  .hub {
-    position: absolute; left: 30%; top: 30%; width: 40%; height: 40%; border-radius: 50%;
-    display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer;
-    background: radial-gradient(circle at 34% 26%, rgba(255,255,255,.17), rgba(255,255,255,.03) 50%, rgba(255,111,181,.07) 100%);
-    box-shadow: inset 0 0 0 .6px rgba(255,255,255,.42), inset 0 -10px 20px rgba(255,111,181,.11), 0 0 26px rgba(255,111,181,.13);
-    transition: transform .12s ease;
-  }
-  .hub.down { transform: scale(.96); }
-  .hub.pop { animation: hubpop .34s ease; }
-  @keyframes hubpop { 35% { box-shadow: inset 0 0 0 .8px rgba(255,170,215,.9), inset 0 -10px 24px rgba(255,111,181,.3), 0 0 46px rgba(255,111,181,.5); } }
-  .hub-char { font-size: clamp(44px, 5.8vw, 66px); line-height: 1; color: #fff; }
-  .hub-char.long { font-size: clamp(13px, 1.4vw, 17px); white-space: nowrap; }
-  .hub-mode { margin-top: 6px; padding: 6px 10px; font-size: 13px; letter-spacing: .08em; color: rgba(255,255,255,.62); display: flex; align-items: center; gap: 6px; }
-  .hub-mode::before { content: ""; width: 5px; height: 5px; border-right: 1px solid #ff6fb5; border-bottom: 1px solid #ff6fb5; transform: translateY(-2px) rotate(45deg); }
-  .lens {
-    position: absolute; width: 19%; aspect-ratio: 1 / 1; border-radius: 50%; pointer-events: none;
-    transform: translate(-50%, -50%);
-    display: flex; align-items: center; justify-content: center;
-    background: radial-gradient(circle at 32% 25%, rgba(255,255,255,.36), rgba(255,255,255,.06) 42%, rgba(255,111,181,.1) 100%);
-    -webkit-backdrop-filter: blur(3px) saturate(180%); backdrop-filter: blur(3px) saturate(180%);
-    box-shadow: inset 0 0 0 .7px rgba(255,255,255,.62), inset 0 -6px 12px rgba(255,111,181,.2), inset 0 4px 8px rgba(255,255,255,.16),
-                0 0 24px rgba(255,111,181,.42), 0 6px 18px rgba(0,0,0,.5);
-  }
-  .lens-char { font-size: clamp(26px, 3.3vw, 38px); color: #ff6fb5; text-shadow: 0 0 10px rgba(255,111,181,.6); }
-  .lens-char.tick { animation: ltick .24s cubic-bezier(.3,.8,.3,1.3); }
-  @keyframes ltick { from { transform: scale(.55); opacity: .25; filter: blur(2px); } }
-  .corner { position: absolute; padding: 8px; font-size: 12px; letter-spacing: .14em; cursor: pointer; transition: opacity .12s, transform .12s; }
-  .corner.down { opacity: .45; transform: scale(.94); }
-  .c-del { left: -6px; top: -6px; color: rgba(255,255,255,.75); }
-  .c-cancel { left: -6px; bottom: -6px; color: #ff3b4a; }
-  .c-enter { right: -6px; top: -6px; color: #2ee6d2; text-shadow: 0 0 12px rgba(46,230,210,.6); }
-  .c-add { right: -6px; bottom: -6px; color: rgba(255,255,255,.55); }
-  #kb.open .corner { animation: kin .45s ease backwards; animation-delay: .2s; }
-  @keyframes kin { from { opacity: 0; transform: translateY(6px); } }
+  #kb.open .stack { animation: kin .4s ease backwards; animation-delay: .18s; }
+  @keyframes kin { from { opacity: 0; } }
   .fly {
     position: fixed; z-index: 100001; pointer-events: none;
-    transform: translate(-50%, -50%); color: #ff6fb5; font-weight: 100;
-    font-size: clamp(40px, 5vw, 60px); text-shadow: 0 0 12px rgba(255,111,181,.6);
-    transition: transform .46s cubic-bezier(.3,.7,.2,1), opacity .46s ease-in;
+    transform: translate(-50%, -50%); color: #ff3d9a; font-weight: 300;
+    font-size: clamp(40px, 5vw, 60px);
+    transition: transform .42s cubic-bezier(.3,.7,.2,1), opacity .42s ease-in;
   }
 </style>
 </head>
@@ -992,7 +986,7 @@ function finishEdit(save) {
 
 /* ---- the keyboard: a rotary dial ----
    Drag around the ring with one finger (it spins with momentum, then settles),
-   the letter at the glass lens is the one selected, tap the centre to place it.
+   the letter at the pink pointer is the one selected; tap the centre (or that letter) to place it.
    Tap a letter on the ring to spin straight to it. Tap the small label under the
    big letter to switch abc / ABC / 123 / kaomoji. */
 const kb = document.getElementById('kb');
@@ -1009,12 +1003,13 @@ const MODES = [
 ];
 const SEL = -Math.PI * 3 / 4;                       // selection point: up-left, facing into the screen
 let mode = 0, rot = SEL, vel = 0, dialRAF = 0, selIdx = -1, dragging = false, snapTarget = null;
-let dial, ring, hub, hubChar, hubMode, lens, lensChar, ringEls = [];
+let dial, ring, hub, hubChar, hubMode, hubGlow, beam, tickEl, stack, ringEls = [];
+const GAP = 0.62;   // half-width (radians) of the open gap at 3 o'clock where the controls sit
 
 const TAU = Math.PI * 2;
 const wrapA = a => { a = (a + Math.PI) % TAU; if (a < 0) a += TAU; return a - Math.PI; };
 const curItems = () => MODES[mode].items;
-const ringLabel = it => MODES[mode].emote ? '•' : it;
+const ringLabel = it => MODES[mode].emote ? '·' : it;
 
 /* Tap = fire on release only if the finger didn't travel. repeat: fire on press and while held. */
 function pressable(el, fn, repeat) {
@@ -1050,30 +1045,40 @@ function buildRing() {
 }
 
 function drawDial() {
-  const D = kb.clientWidth, c = D / 2, R = c * 0.8;
+  const D = kb.clientWidth, c = D / 2, R = c * 0.82;
   const N = ringEls.length, step = TAU / N;
   for (let i = 0; i < N; i++) {
     const a = rot + i * step, d = wrapA(a - SEL);
-    const m = Math.exp(-((d / 0.3) ** 2));                          // magnification near the lens
-    const sc = 1 + 1.1 * m;
-    const fade = 0.18 + 0.82 * Math.max(0, 1 - Math.abs(d) / 2.3);
-    const under = 1 - 0.95 * Math.exp(-((d / 0.1) ** 2));          // the one under the lens hides behind it
+    const m = Math.exp(-((d / 0.22) ** 2));                          // slight swell near the pointer
+    const g = Math.abs(wrapA(a));                                     // distance from 3 o'clock gap
+    const gapFade = Math.max(0, Math.min(1, (g - GAP) / 0.22));
+    const fade = (0.35 + 0.65 * Math.max(0, 1 - Math.abs(d) / 2.6)) * gapFade;
     const el = ringEls[i];
-    el.style.transform = `translate(${c + R * Math.cos(a)}px, ${c + R * Math.sin(a)}px) translate(-50%, -50%) scale(${sc})`;
-    el.style.opacity = (fade * under).toFixed(3);
+    el.style.transform = `translate(${c + R * Math.cos(a)}px, ${c + R * Math.sin(a)}px) translate(-50%, -50%) scale(${1 + 0.55 * m})`;
+    el.style.opacity = fade.toFixed(3);
+    el.style.pointerEvents = gapFade > 0.5 ? 'auto' : 'none';
   }
-  lens.style.left = (c + R * Math.cos(SEL)) + 'px';
-  lens.style.top = (c + R * Math.sin(SEL)) + 'px';
+  // pointer: beam from the hub edge out to the ring, and a tick just outside the ring
+  const hubR = D * 0.21;
+  beam.style.width = (R - hubR + 4) + 'px';
+  beam.style.transform = `rotate(${SEL}rad) translateX(${hubR - 6}px)`;
+  const tr = R + D * 0.1;
+  tickEl.style.left = (c + tr * Math.cos(SEL) - 1) + 'px';
+  tickEl.style.top = (c + tr * Math.sin(SEL) - 8) + 'px';
+  tickEl.style.transform = `rotate(${SEL + Math.PI / 2}rad)`;
+  hubGlow.style.setProperty('--a', (SEL * 180 / Math.PI + 90 - 40) + 'deg');
+  stack.style.left = (c + D * 0.255) + 'px';                     // sits inside the disc, in the gap
+  stack.style.top = c + 'px';
   const idx = ((Math.round((SEL - rot) / step) % N) + N) % N;
   if (idx !== selIdx) { selIdx = idx; showSel(); }
 }
 
 function showSel() {
   const it = curItems()[selIdx];
-  hubChar.textContent = it === '␣' ? '␣' : it;
+  ringEls.forEach((el, i) => el.classList.toggle('sel', i === selIdx));
+  hubChar.textContent = it;
   hubChar.classList.toggle('long', !!MODES[mode].emote);
-  lensChar.textContent = ringLabel(it);
-  lensChar.classList.remove('tick'); void lensChar.offsetWidth; lensChar.classList.add('tick');
+  hubChar.classList.remove('tick2'); void hubChar.offsetWidth; hubChar.classList.add('tick2');
 }
 
 function spin() {
@@ -1130,21 +1135,28 @@ function setMode(next) {
 
 function buildKb() {
   dial = document.createElement('div'); dial.className = 'dial';
-  const wedge = document.createElement('div'); wedge.className = 'wedge';
+  const t1 = document.createElement('div'); t1.className = 'track t1';
+  const t2 = document.createElement('div'); t2.className = 'track t2';
+  beam = document.createElement('div'); beam.className = 'beam';
+  tickEl = document.createElement('div'); tickEl.className = 'tick';
   ring = document.createElement('div'); ring.style.cssText = 'position:absolute;inset:0;';
   hub = document.createElement('div'); hub.className = 'hub';
+  hubGlow = document.createElement('div'); hubGlow.className = 'glow';
+  const rim2 = document.createElement('div'); rim2.className = 'rim2';
+  const rim = document.createElement('div'); rim.className = 'rim';
+  const face = document.createElement('div'); face.className = 'face';
   hubChar = mk('hub-char', 'a');
   hubMode = mk('hub-mode', MODES[mode].label);
-  hub.append(hubChar, hubMode);
-  dial.append(wedge, ring, hub);
-  lens = document.createElement('div'); lens.className = 'lens';
-  lensChar = mk('lens-char', 'a');
-  lens.append(lensChar);
+  face.append(hubChar, hubMode);
+  hub.append(hubGlow, rim2, rim, face);
+  dial.append(t2, t1, beam, ring, hub, tickEl);
 
-  const del = mk('corner c-del', 'delete');
-  const cancel = mk('corner c-cancel', 'cancel');
-  const enter = mk('corner c-enter', 'enter');
-  const add = mk('corner c-add', '+ videos');
+  stack = document.createElement('div'); stack.className = 'stack';
+  const enter = mk('ctl enter', 'OK');
+  const del = mk('ctl', 'delete');
+  const cancel = mk('ctl cancel', 'cancel');
+  const add = mk('ctl add', '+ videos');
+  stack.append(enter, del, cancel, add);
   pressable(del, () => typeKey('⌫'), true);
   pressable(cancel, () => finishEdit(false));
   pressable(enter, () => finishEdit(true));
@@ -1156,7 +1168,7 @@ function buildKb() {
   pressable(hub, placeSel);
   pressable(hubMode, () => setMode(mode + 1));
 
-  kb.append(dial, lens, del, cancel, enter, add);
+  kb.append(dial, stack);
   buildRing();
 
   // one-finger spinning
@@ -1186,9 +1198,10 @@ function buildKb() {
     dragging = false;
     if (moved < 0.05) {
       vel = 0;
-      const lr = lens.getBoundingClientRect();
-      if (Math.hypot(downX - (lr.left + lr.width / 2), downY - (lr.top + lr.height / 2)) < lr.width / 2) placeSel();
-      else if (downItem) spinTo(+downItem.dataset.i);
+      if (downItem) {
+        if (+downItem.dataset.i === selIdx) placeSel();             // tap the selected letter = place it
+        else spinTo(+downItem.dataset.i);
+      }
     } else if (performance.now() - lastT > 80) vel = 0;           // finger stopped before lifting
     spin();
   };
@@ -1247,7 +1260,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-13-044204';
+const BUILD = '2026-11-13-044921';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
