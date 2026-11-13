@@ -345,7 +345,9 @@ function textRight() {
    once the screen fills up; new ones never move old ones. */
 function placeSpread(o, animate) {
   const { W, H } = view();
-  const w = capWidth(o.aspect), h = w / o.aspect;
+  // a little variety: each window opens somewhere between ~70% and 100% of the size cap
+  if (o.scale == null) o.scale = 0.7 + Math.random() * 0.3;
+  const w = capWidth(o.aspect) * o.scale, h = w / o.aspect;
   const others = wins.filter(p => p !== o);
   const texts = textRects();
   const hit = (l, t, p) => {
@@ -354,18 +356,21 @@ function placeSpread(o, animate) {
     return ox * oy;
   };
   const area = w * h, diag = Math.hypot(W, H);
-  let best = null;
-  const step = 16;
-  for (let t = PAD; t <= Math.max(PAD, H - h - PAD); t += step) {
-    for (let l = PAD; l <= Math.max(PAD, W - w - PAD); l += step) {
+  const spots = [];
+  const step = 16, jx = Math.random() * step, jy = Math.random() * step;
+  for (let t = PAD + jy; t <= Math.max(PAD, H - h - PAD); t += step) {
+    for (let l = PAD + jx; l <= Math.max(PAD, W - w - PAD); l += step) {
       let win = 0, txt = 0;
       for (const p of others) win += hit(l, t, p);
       for (const p of texts) txt += hit(l, t, p);
       const lean = Math.hypot(W - PAD - (l + w), t - PAD) / diag;     // prefer top-right
-      const score = (win / area) * 1.0 + (txt / area) * 4 + lean * 0.12;
-      if (!best || score < best.score) best = { score, l, t };
+      spots.push({ score: (win / area) * 1.0 + (txt / area) * 4 + lean * 0.12, l, t });
     }
   }
+  // don't always take the single best spot: pick at random among the near-best ones
+  spots.sort((a, b) => a.score - b.score);
+  const near = spots.filter(p => p.score <= (spots[0] ? spots[0].score : 0) + 0.08).slice(0, 40);
+  const best = near.length ? near[Math.floor(Math.random() * near.length)] : spots[0];
   Object.assign(o, { w, h, left: best ? best.l : W - PAD - w, top: best ? best.t : PAD });
   apply(o, animate);
 }
@@ -911,7 +916,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-13-001919';
+const BUILD = '2026-11-13-002111';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
