@@ -148,28 +148,39 @@
   .hub-mode::before { content: ""; width: 5px; height: 5px; border-right: 1px solid #ff6fb5; border-bottom: 1px solid #ff6fb5; transform: translateY(-2px) rotate(45deg); }
   .hub-mode.down { color: #ff6fb5; }
   /* controls live to the left of the wheel, away from the spinning hand */
-  .bar { position: absolute; right: calc(100% + 22px); bottom: 7%; display: flex; align-items: center; gap: 20px; white-space: nowrap; }
+  /* cancel / + videos / OK: centred along the bottom of the screen while renaming */
+  .bar {
+    position: fixed; left: 50%; bottom: calc(30px + env(safe-area-inset-bottom)); z-index: 100000;
+    display: flex; align-items: center; gap: 34px; white-space: nowrap;
+    transform: translate(-50%, 12px); opacity: 0; pointer-events: none;
+    transition: transform .4s cubic-bezier(.2,.9,.25,1.08), opacity .25s ease;
+  }
+  .bar.open { transform: translate(-50%, 0); opacity: 1; pointer-events: auto; }
   .ctl { font-size: 15px; font-weight: 200; letter-spacing: .04em; color: rgba(255,255,255,.75); cursor: pointer; padding: 8px 0; transition: opacity .1s, transform .1s; }
   .ctl.down { opacity: .45; transform: scale(.96); }
   .ctl.cancel { color: #ff3b4a; }
   .ctl.add { color: rgba(255,255,255,.45); }
   .ctl.enter { color: #2ee6d2; text-shadow: 0 0 12px rgba(46,230,210,.55); }
-  /* bare icons tucked into the empty corners of the square the wheel sits in */
-  .kbtn {
-    position: absolute; width: 44px; height: 44px; cursor: pointer;   /* 44px = comfortable tap area */
-    display: flex; align-items: center; justify-content: center;
-    color: rgba(255,255,255,.85);
-    transition: color .15s, transform .1s;
+  /* corner pieces: the leftover space between the wheel and its square, outlined like the segments */
+  .kbtn { position: absolute; width: 32%; height: 32%; pointer-events: none; color: rgba(255,255,255,.85); }
+  .kbtn.k-del { top: 0; right: 0; }
+  .kbtn.heart { bottom: 0; left: 0; }
+  .kbtn.caps { bottom: 0; right: 0; }
+  .kbtn .shape { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .kbtn .shape path {
+    fill: rgba(0,0,0,.88); stroke: rgba(255,255,255,.24); stroke-width: 1; vector-effect: non-scaling-stroke;
+    stroke-linejoin: round; pointer-events: all; cursor: pointer; transition: fill .15s, stroke .15s;
   }
-  .kbtn svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-  .kbtn.down { transform: scale(.88); }
+  .kbtn.down .shape path { fill: rgba(255,255,255,.07); }
+  .kbtn.on .shape path { stroke: #ff6fb5; fill: rgba(255,111,181,.09); }
+  .kbtn .ico {
+    position: absolute; width: 24px; height: 24px; transform: translate(-50%, -50%); pointer-events: none;
+    fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; transition: transform .1s, color .15s;
+  }
+  .kbtn.down .ico { transform: translate(-50%, -50%) scale(.88); }
   .kbtn.on { color: #ff6fb5; }
-  .kbtn.heart.on svg { fill: rgba(255,111,181,.4); }
-  /* icon centres sit ~10.5% in from each edge: between the wheel and the box corner */
-  .kbtn.k-del { top: calc(10.5% - 22px); right: calc(10.5% - 22px); }
-  .kbtn.heart { bottom: calc(10.5% - 22px); left: calc(10.5% - 22px); }
-  .kbtn.caps { bottom: calc(10.5% - 22px); right: calc(10.5% - 22px); }
-  #kb.open .bar, #kb.open .kbtn { animation: kin .4s ease backwards; animation-delay: .18s; }
+  .kbtn.heart.on .ico { fill: rgba(255,111,181,.4); }
+  #kb.open .kbtn { animation: kin .4s ease backwards; animation-delay: .18s; }
   @keyframes kin { from { opacity: 0; } }
   .fly {
     position: fixed; z-index: 100001; pointer-events: none;
@@ -1036,7 +1047,7 @@ const RINGS = {
 };
 for (const k in RINGS) Object.assign(RINGS[k], { rot: SEL, vel: 0, snap: null, raf: 0, wedges: [], labels: [], sel: -1, drag: false });
 let mode = 0, active = 'outer', caps = false, emote = false;
-let dial, svg, hub, trio, capsBtn, heartBtn;
+let dial, svg, hub, trio, capsBtn, heartBtn, bar;
 
 /* Tap = fire on release only if the finger didn't travel. repeat: fire on press and while held. */
 function pressable(el, fn, repeat) {
@@ -1205,9 +1216,22 @@ function buildKb() {
   hub.append(trio);
   dial.append(svg, hub);
 
+  // Corner piece (in the wheel's 0-200 units): square corner rounded, inner edge follows the wheel.
+  // Drawn for the top-right, then rotated into the other corners.
+  const cornerPath = (() => {
+    const Rc = 109, h = Math.sqrt(Rc * Rc - 100 * 100), rc = 12;   // Rc: keeps a clear gap from the wheel
+    return `M ${100 + h} 0 L ${200 - rc} 0 Q 200 0 200 ${rc} L 200 ${100 - h} A ${Rc} ${Rc} 0 0 0 ${100 + h} 0 Z`;
+  })();
+  const CORNERS = {
+    'k-del': { rot: 0,   box: '136 0 64 64',   at: [79, 21] },
+    'caps':  { rot: 90,  box: '136 136 64 64', at: [79, 79] },
+    'heart': { rot: 180, box: '0 136 64 64',   at: [21, 79] }
+  };
   const icon = (cls, paths) => {
+    const k = CORNERS[cls];
     const b = document.createElement('div'); b.className = 'kbtn ' + cls;
-    b.innerHTML = `<svg viewBox="0 0 24 24">${paths}</svg>`;
+    b.innerHTML = `<svg class="shape" viewBox="${k.box}" preserveAspectRatio="none"><path d="${cornerPath}" transform="rotate(${k.rot} 100 100)"/></svg>`
+                + `<svg class="ico" viewBox="0 0 24 24" style="left:${k.at[0]}%;top:${k.at[1]}%">${paths}</svg>`;
     return b;
   };
   const del = icon('k-del', '<path d="M9.5 6H19a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 19 18H9.5L4 12z"/><path d="M12.5 9.5l5 5M17.5 9.5l-5 5"/>');
@@ -1217,7 +1241,8 @@ function buildKb() {
   pressable(capsBtn, () => { caps = !caps; emote = false; setMode(caps ? 1 : 0); });
   pressable(heartBtn, () => { emote = !emote; setMode(emote ? 2 : (caps ? 1 : 0)); });
 
-  const bar = document.createElement('div'); bar.className = 'bar';
+  bar = document.createElement('div'); bar.className = 'bar';
+  bar.addEventListener('pointerdown', e => e.stopPropagation());
   const enter = mk('ctl enter', 'OK');
   const cancel = mk('ctl cancel', 'cancel');
   const add = mk('ctl add', '+ videos');
@@ -1228,7 +1253,8 @@ function buildKb() {
   add.addEventListener('pointerdown', e => { e.stopPropagation(); add.classList.add('down'); });
   add.addEventListener('pointerup', () => add.classList.remove('down'));
   add.addEventListener('click', e => { e.stopPropagation(); picker.click(); });
-  kb.append(dial, bar, del, heartBtn, capsBtn);
+  kb.append(dial, del, heartBtn, capsBtn);
+  document.body.append(bar);
   buildRing('inner'); buildRing('outer');
 
   // one-finger spinning of whichever ring you touch; a still tap on a segment spins to it
@@ -1288,6 +1314,7 @@ function buildKb() {
 function updateShift() {}
 function openKb() {
   kb.classList.add('open'); kb.setAttribute('aria-hidden', 'false');
+  bar.classList.add('open');
   buildRing('inner'); buildRing('outer');                       // replays the label fade-in
   active = 'outer';
   RINGS.outer.rot = SEL + 1.2; RINGS.outer.snap = SEL; spin('outer');
@@ -1295,6 +1322,7 @@ function openKb() {
 }
 function closeKb() {
   kb.classList.remove('open'); kb.setAttribute('aria-hidden', 'true');
+  bar.classList.remove('open');
   for (const k in RINGS) cancelAnimationFrame(RINGS[k].raf);
 }
 kb.addEventListener('pointerdown', e => e.stopPropagation());
@@ -1334,7 +1362,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-13-052300';
+const BUILD = '2026-11-13-052543';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
