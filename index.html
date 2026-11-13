@@ -182,26 +182,29 @@
   .kbtn.heart.on .ico { fill: rgba(255,111,181,.4); }
   .kbtn.caps.lock .shape path { fill: rgba(255,111,181,.24); }
   .kbtn.ext { top: 0; left: 0; }
-  .kbtn.ext .ico { stroke-width: 2.6; transition: transform .35s cubic-bezier(.2,.9,.3,1.2), color .15s; }
-  .kbtn.ext.on .ico { transform: translate(-50%, -50%) rotate(180deg); }
+  .kbtn.ext .shape path { cursor: grab; }
+  .kbtn.k-redo { top: 0; right: 0; }
+  .kbtn.k-del .ico, .kbtn.k-redo .ico { width: 21px; height: 21px; }
 
   /* bottom-row keyboard icon (summons the iPad's own keyboard) */
   .ctl.kbd svg { width: 26px; height: 26px; display: block; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
   #native { position: fixed; left: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; font-size: 16px; border: 0; padding: 0; pointer-events: none; }
 
-  /* pull-out keyboard: a plain grid keyboard that extends out of the wheel to the left */
+  /* pull-out keyboard: a window that unfolds out of the wheel's top-left corner */
   .xkb {
-    position: fixed; z-index: 100000;
-    right: calc(26px + clamp(290px, 34vw, 380px) + 22px + env(safe-area-inset-right));
-    bottom: calc(92px + env(safe-area-inset-bottom));
-    width: min(680px, calc(100vw - clamp(290px, 34vw, 380px) - 96px));
+    position: fixed; z-index: 99999;                       /* tucked under the wheel so the tab stays grabbable */
+    right: calc(26px + clamp(290px, 34vw, 380px) - 26px + env(safe-area-inset-right));
+    bottom: calc(26px + clamp(290px, 34vw, 380px) - 26px + env(safe-area-inset-bottom));
+    width: min(620px, calc(100vw - clamp(290px, 34vw, 380px) - 40px));
     padding: 14px; border-radius: 22px; box-sizing: border-box;
-    background: rgba(0,0,0,.92); box-shadow: inset 0 0 0 1px rgba(255,255,255,.2);
-    clip-path: inset(0 0 0 100% round 22px); opacity: 0; pointer-events: none;
-    transition: clip-path .55s cubic-bezier(.2,.9,.25,1), opacity .2s ease;
+    background: rgba(0,0,0,.94); box-shadow: inset 0 0 0 1px rgba(255,255,255,.2), 0 24px 70px rgba(0,0,0,.6);
+    transform-origin: 100% 100%;
+    transform: perspective(1400px) rotateX(30deg) rotateY(-30deg) scale(.15); opacity: 0; pointer-events: none;
+    transition: transform .55s cubic-bezier(.2,.9,.25,1.04), opacity .3s ease;
     touch-action: none;
   }
-  .xkb.open { clip-path: inset(0 0 0 0 round 22px); opacity: 1; pointer-events: auto; }
+  .xkb.dragging { transition: none; }
+  .xkb.open { pointer-events: auto; }
   .emo-strip {
     position: relative; overflow: hidden; height: 42px; border-radius: 12px; margin-bottom: 4px;
     background: rgba(255,255,255,.04); box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); cursor: grab;
@@ -211,10 +214,10 @@
   .emo-track { position: absolute; left: 0; top: 0; height: 100%; display: flex; align-items: center; gap: 26px; padding: 0 13px; white-space: nowrap; will-change: transform; }
   .emo { font-size: 15px; font-weight: 300; color: rgba(255,255,255,.82); transition: color .1s; }
   .emo.down { color: #ff6fb5; }
-  .xrow { display: grid; grid-template-columns: repeat(13, 1fr); gap: 6px; margin-top: 6px; }
-  .xrow.nums { grid-template-columns: repeat(10, 1fr); }
+  .xrow { display: flex; justify-content: center; gap: 6px; margin-top: 6px; }
   .xk {
-    height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer;
+    width: calc((100% - 54px) / 10); flex: none;
+    height: 46px; border-radius: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer;
     font-size: 20px; font-weight: 200; color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,.2);
     transition: color .1s, box-shadow .1s, background .1s, transform .08s;
   }
@@ -1018,17 +1021,24 @@ function typeKey(k) {
   if (!editing) return;
   editing.cutting = false;
   const parts = editing.parts || (editing.parts = []);
+  const redoStack = editing.redo || (editing.redo = []);
   if (k === '⌫') {
     const last = parts.pop();
-    editing.buf = last && editing.buf.endsWith(last)
-      ? editing.buf.slice(0, editing.buf.length - last.length)
-      : [...editing.buf].slice(0, -1).join('');
+    const cut = last && editing.buf.endsWith(last) ? last : [...editing.buf].slice(-1).join('');
+    if (cut) redoStack.push(cut);
+    editing.buf = editing.buf.slice(0, editing.buf.length - cut.length);
+  }
+  else if (k === '↻') {                                     // put back what backspace removed
+    const back = redoStack.pop();
+    if (!back) return;
+    editing.buf += back; parts.push(back);
   }
   else if (k === '⇧') { editing.shift = !editing.shift; updateShift(); return; }
   else {
     let ch = k === 'space' ? ' ' : k;
     if (editing.shift && ch.length === 1) { ch = ch.toUpperCase(); editing.shift = false; updateShift(); }
     editing.buf += ch; parts.push(ch);
+    redoStack.length = 0;                                   // typing something new clears redo
   }
   editing.txt.textContent = editing.buf;
   if (nativeIn && document.activeElement === nativeIn) nativeIn.value = editing.buf;
@@ -1284,36 +1294,95 @@ function buildKb() {
 
   // Corner piece (in the wheel's 0-200 units): square corner rounded, inner edge follows the wheel.
   // Drawn for the top-right, then rotated into the other corners.
-  const cornerPath = (() => {
-    const Rc = 109, h = Math.sqrt(Rc * Rc - 100 * 100), rc = 22;   // Rc: keeps a clear gap from the wheel
-    const rt = 21;                                                     // rounding on the two thin ends
-    const P = (r, ang) => `${(100 + r * Math.cos(ang)).toFixed(2)} ${(100 + r * Math.sin(ang)).toFixed(2)}`;
-    const a1 = Math.atan2(-100, h), a2 = Math.atan2(-h, 100), d = rt / Rc;
-    return `M ${100 + h + rt} 0 L ${200 - rc} 0 Q 200 0 200 ${rc} L 200 ${100 - h - rt} `
-         + `Q 200 ${100 - h} ${P(Rc, a2 - d)} A ${Rc} ${Rc} 0 0 0 ${P(Rc, a1 + d)} `
-         + `Q ${100 + h} 0 ${100 + h + rt} 0 Z`;
-  })();
+  // Corner pieces are drawn for the top-right corner (wheel units 0-200, centre 100) and rotated
+  // into place. Each is a polygon whose corners get their own rounding; the inner edge follows
+  // a circle around the wheel.
+  const roundPoly = pts => {
+    const n = pts.length, f = v => `${v[0].toFixed(2)} ${v[1].toFixed(2)}`;
+    const mid = [(pts[n - 1].x + pts[0].x) / 2, (pts[n - 1].y + pts[0].y) / 2];
+    let d = `M ${f(mid)}`;
+    for (let i = 0; i < n; i++) {
+      const v = pts[i], p = pts[(i - 1 + n) % n], q = pts[(i + 1) % n];
+      const lp = Math.hypot(p.x - v.x, p.y - v.y), lq = Math.hypot(q.x - v.x, q.y - v.y);
+      const r = Math.min(v.r || 0, lp / 2, lq / 2);
+      if (r <= 0) { d += ` L ${f([v.x, v.y])}`; continue; }
+      const a = [v.x + (p.x - v.x) * r / lp, v.y + (p.y - v.y) * r / lp];
+      const b = [v.x + (q.x - v.x) * r / lq, v.y + (q.y - v.y) * r / lq];
+      d += ` L ${f(a)} Q ${f([v.x, v.y])} ${f(b)}`;
+    }
+    return d + ' Z';
+  };
+  const onCircle = (R, ang, r = 0) => ({ x: 100 + R * Math.cos(ang), y: 100 + R * Math.sin(ang), r });
+  const arcPts = (R, from, to) => {                                 // points strictly between two angles
+    const n = Math.max(2, Math.ceil(Math.abs(to - from) / 0.05)), out = [];
+    for (let i = 1; i < n; i++) out.push(onCircle(R, from + (to - from) * i / n));
+    return out;
+  };
+  const tips = R => { const h = Math.sqrt(R * R - 100 * 100); return { h, a1: Math.atan2(-100, h), a2: Math.atan2(-h, 100) }; };
+  const wholePiece = (R, rc, rt) => {
+    const { h, a1, a2 } = tips(R);
+    return roundPoly([{ x: 100 + h, y: 0, r: rt }, { x: 200, y: 0, r: rc }, { x: 200, y: 100 - h, r: rt }, ...arcPts(R, a2, a1)]);
+  };
+  // the top-right piece split along its diagonal: redo (top half) and backspace (right half, nearer the hand)
+  const splitPieces = (R, rc, rt, g) => {
+    const { h, a1, a2 } = tips(R), mid = -Math.PI / 4, dA = g / R, dE = g * Math.SQRT2;
+    const redo = roundPoly([{ x: 100 + h, y: 0, r: rt }, { x: 200 - dE, y: 0, r: rc * .6 },
+                            onCircle(R, mid - dA, 6), ...arcPts(R, mid - dA, a1)]);
+    const back = roundPoly([{ x: 200, y: dE, r: rc * .6 }, { x: 200, y: 100 - h, r: rt },
+                            ...arcPts(R, a2, mid + dA), onCircle(R, mid + dA, 6)]);
+    return { redo, back };
+  };
+  const MAIN = wholePiece(109, 22, 21), SPLIT = splitPieces(109, 22, 21, 2.4);
   const CORNERS = {
-    'k-del': { rot: 0,   box: '136 0 64 64',   at: [79, 21] },
-    'caps':  { rot: 90,  box: '136 136 64 64', at: [79, 79] },
-    'heart': { rot: 180, box: '0 136 64 64',   at: [21, 79] },
-    'ext':   { rot: 270, box: '0 0 64 64',     at: [21, 21] }
+    'k-del':  { d: SPLIT.back, rot: 0,   box: '136 0 64 64',   at: [80, 46] },
+    'k-redo': { d: SPLIT.redo, rot: 0,   box: '136 0 64 64',   at: [54, 20] },
+    'caps':   { d: MAIN,       rot: 90,  box: '136 136 64 64', at: [79, 79] },
+    'heart':  { d: MAIN,       rot: 180, box: '0 136 64 64',   at: [21, 79] },
+    'ext':    { d: wholePiece(121, 10, 9), rot: 270, box: '0 0 64 64', at: null }   // thin pull tab, no icon
   };
   const icon = (cls, paths) => {
     const k = CORNERS[cls];
     const b = document.createElement('div'); b.className = 'kbtn ' + cls;
-    b.innerHTML = `<svg class="shape" viewBox="${k.box}" preserveAspectRatio="none"><path d="${cornerPath}" transform="rotate(${k.rot} 100 100)"/></svg>`
-                + `<svg class="ico" viewBox="0 0 24 24" style="left:${k.at[0]}%;top:${k.at[1]}%">${paths}</svg>`;
+    b.innerHTML = `<svg class="shape" viewBox="${k.box}" preserveAspectRatio="none"><path d="${k.d}" transform="rotate(${k.rot} 100 100)"/></svg>`
+                + (k.at ? `<svg class="ico" viewBox="0 0 24 24" style="left:${k.at[0]}%;top:${k.at[1]}%">${paths}</svg>` : '');
     return b;
   };
   const del = icon('k-del', '<path d="M9.5 6H19a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 19 18H9.5L4 12z"/><path d="M12.5 9.5l5 5M17.5 9.5l-5 5"/>');
+  const redo = icon('k-redo', '<path d="M18.5 9.5H9.5a4.5 4.5 0 0 0 0 9h3"/><path d="M15 6l3.5 3.5L15 13"/>');
   heartBtn = icon('heart', '<path d="M12 19.5s-7.5-4.6-7.5-10.2A4.1 4.1 0 0 1 12 6.9a4.1 4.1 0 0 1 7.5 2.4c0 5.6-7.5 10.2-7.5 10.2z"/>');
   capsBtn = icon('caps', '<path d="M12 4.5l7 7h-3.8v4.2H8.8v-4.2H5z"/><path d="M8.8 19.5h6.4"/>');
   pressable(del, () => typeKey('⌫'), true);
-  extBtn = icon('ext', '<path d="M14.5 5.5H5.5v9"/><path d="M5.8 5.8l11.7 11.7"/>');
+  pressable(redo, () => typeKey('↻'));
+  extBtn = icon('ext', '');
   pressable(capsBtn, tapCaps);
   pressable(heartBtn, () => { emote = !emote; setMode(emote ? 2 : (capsState !== 'off' ? 1 : 0)); });
-  pressable(extBtn, () => toggleXkb());
+
+  // pull the thin top-left tab out (up-left) and the second keyboard unfolds out of the corner;
+  // a tap toggles it, pulling back down-right folds it away
+  let pull = null;
+  extBtn.addEventListener('pointerdown', e => {
+    e.preventDefault(); e.stopPropagation();
+    extBtn.setPointerCapture(e.pointerId);
+    pull = { x: e.clientX, y: e.clientY, from: xProg, moved: 0 };
+    extBtn.classList.add('down');
+    xkb.classList.add('dragging');
+  });
+  extBtn.addEventListener('pointermove', e => {
+    if (!pull) return;
+    const dx = pull.x - e.clientX, dy = pull.y - e.clientY;
+    pull.moved = Math.max(pull.moved, Math.hypot(dx, dy));
+    if (pull.moved > 8) setXProg(Math.max(0, Math.min(1, pull.from + (dx + dy) / Math.SQRT2 / 260)));
+  });
+  const release = () => {
+    if (!pull) return;
+    extBtn.classList.remove('down');
+    xkb.classList.remove('dragging');
+    if (pull.moved <= 8) toggleXkb();
+    else toggleXkb(xProg > (pull.from > .5 ? .65 : .3));
+    pull = null;
+  };
+  extBtn.addEventListener('pointerup', release);
+  extBtn.addEventListener('pointercancel', release);
 
   bar = document.createElement('div'); bar.className = 'bar';
   bar.addEventListener('pointerdown', e => e.stopPropagation());
@@ -1340,7 +1409,7 @@ function buildKb() {
   add.addEventListener('pointerdown', e => { e.stopPropagation(); add.classList.add('down'); });
   add.addEventListener('pointerup', () => add.classList.remove('down'));
   add.addEventListener('click', e => { e.stopPropagation(); picker.click(); });
-  kb.append(dial, del, heartBtn, capsBtn, extBtn);
+  kb.append(dial, del, redo, heartBtn, capsBtn, extBtn);
   document.body.append(bar);
   buildXkb();
   buildNative();
@@ -1435,7 +1504,7 @@ function buildXkb() {
   strip.addEventListener('pointerup', up);
   strip.addEventListener('pointercancel', up);
 
-  const rows = [[...'1234567890'], [...'abcdefghijklm'], [...'nopqrstuvwxyz']];
+  const rows = [[...'1234567890'], [...'qwertyuiop'], [...'asdfghjkl'], [...'zxcvbnm']];
   let i = 0;
   xKeys = [];
   rows.forEach((r, ri) => {
@@ -1457,12 +1526,20 @@ function emoLoop(now) {
   if (emoHalf) { while (emoX <= -emoHalf) emoX += emoHalf; while (emoX > 0) emoX -= emoHalf; }
   emoTrack.style.transform = `translateX(${emoX}px)`;
 }
+let xProg = 0;                                              // 0 = folded into the corner, 1 = fully open
+function setXProg(p) {
+  xProg = p;
+  const q = 1 - p;
+  xkb.style.transform = `perspective(1400px) rotateX(${(q * 30).toFixed(2)}deg) rotateY(${(-q * 30).toFixed(2)}deg) scale(${(0.15 + 0.85 * p).toFixed(3)})`;
+  xkb.style.opacity = Math.min(1, p * 1.6).toFixed(3);
+  if (p > 0 && !emoRAF) { emoHalf = 0; emoResume = 0; emoRAF = requestAnimationFrame(emoLoop); }
+}
 function toggleXkb(force) {
   const open = force === undefined ? !xkb.classList.contains('open') : force;
   xkb.classList.toggle('open', open);
   extBtn.classList.toggle('on', open);
-  cancelAnimationFrame(emoRAF);
-  if (open) { emoHalf = 0; emoResume = 0; emoRAF = requestAnimationFrame(emoLoop); }
+  setXProg(open ? 1 : 0);
+  if (!open) { cancelAnimationFrame(emoRAF); emoRAF = 0; }
 }
 
 /* ---- the iPad's own keyboard, via a hidden text field kept in sync with the title ---- */
@@ -1540,7 +1617,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-13-053933';
+const BUILD = '2026-11-13-054735';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
