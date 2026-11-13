@@ -310,47 +310,61 @@ function apply(o, animate) {
 
 const anyAdjusted = () => wins.some(o => o.adjusted);
 
-/* Nobody has moved/resized anything yet: tile every window into a tidy grid. */
-function tile() {
-  const n = wins.length;
-  if (!n) return;
-  const { W, H } = view();
-  let best = null;
-  for (let c = 1; c <= n; c++) {
-    const r = Math.ceil(n / c);
-    const cw = (W - PAD * (c + 1)) / c;
-    const ch = (H - PAD * (r + 1)) / r;
-    if (cw < 80 || ch < 60) continue;
-    let area = 0;
-    const cells = wins.map((o, i) => {
-      const col = i % c, row = Math.floor(i / c);
-      const inRow = Math.min(c, n - row * c);                 // center a short last row
-      const rowOffset = (c - inRow) * (cw + PAD) / 2;
-      const w = Math.min(cw, ch * o.aspect, capWidth(o.aspect));
-      const h = w / o.aspect;
-      area += w * h;
-      return {
-        w, h,
-        left: rowOffset + PAD + col * (cw + PAD) + (cw - w) / 2,
-        top: PAD + row * (ch + PAD) + (ch - h) / 2
-      };
-    });
-    if (!best || area > best.area * 1.02) best = { area, cells };
+/* Where the visible title text sits on screen right now (windows try not to cover it). */
+function textRects() {
+  const out = [];
+  for (const row of list.children) {
+    const t = row.querySelector('.txt, .etxt');
+    if (!t || !t.textContent) continue;
+    const r = t.getBoundingClientRect();
+    if (r.bottom < 0 || r.top > innerHeight || r.width === 0) continue;
+    out.push({ left: r.left - 8, top: r.top - 4, w: r.width + 16, h: r.height + 8 });
   }
-  if (!best) return;
-  wins.forEach((o, i) => { Object.assign(o, best.cells[i]); apply(o, true); });
+  return out;
+}
+function textRight() {
+  return textRects().reduce((m, r) => Math.max(m, r.left + r.w), 0);
 }
 
-/* Someone has arranged things: leave every other window alone and
-   drop this one into the emptiest spot, shrinking it if needed. */
+/* Untouched windows stack: a cascade down-and-to-the-left from the top-right,
+   kept clear of the title text when there's room. New ones never move old ones. */
+function placeStack(o, animate) {
+  const { W, H } = view();
+  const w = capWidth(o.aspect), h = w / o.aspect;
+  const STEP = 34, PER = 5;
+  const clearX = textRight() + PAD;                     // first x that's free of text
+  const roomRight = W - PAD - clearX;
+  const others = wins.filter(p => p !== o);
+  for (let i = 0; i < 40; i++) {
+    const col = Math.floor(i / PER), k = i % PER;
+    let right = W - PAD - 10 - k * STEP - col * w * 0.55;
+    let top = PAD + 24 + k * STEP + col * 18;
+    // keep the stack right of the text if it fits
+    if (roomRight >= w + (PER - 1) * STEP && right - w < clearX) right = clearX + w;
+    if (top + h > H - PAD) top = Math.max(PAD, H - PAD - h - k * 6);
+    const left = Math.max(PAD, right - w);
+    const taken = others.some(p => Math.abs(p.left - left) < 12 && Math.abs(p.top - top) < 12);
+    if (taken) continue;
+    Object.assign(o, { w, h, left, top, slot: i });
+    apply(o, animate);
+    return;
+  }
+  Object.assign(o, { w, h, left: W - PAD - w, top: PAD });
+  apply(o, animate);
+}
+
 function placeFree(o, ax, ay, animate) {
   const { W, H } = view();
   const others = wins.filter(p => p !== o);
-  const overlap = (l, t, w, h) => others.reduce((s, p) => {
+  const texts = textRects();
+  const hit = (l, t, w, h, p) => {
     const ox = Math.max(0, Math.min(l + w, p.left + p.w) - Math.max(l, p.left));
     const oy = Math.max(0, Math.min(t + h, p.top + p.h) - Math.max(t, p.top));
-    return s + ox * oy;
-  }, 0);
+    return ox * oy;
+  };
+  const overlap = (l, t, w, h) =>
+    others.reduce((s, p) => s + hit(l, t, w, h, p), 0) +
+    texts.reduce((s, p) => s + hit(l, t, w, h, p) * 0.6, 0);
 
   let fallback = null;
   for (const s of [1, 0.8, 0.64, 0.5, 0.38]) {
@@ -373,12 +387,16 @@ function placeFree(o, ax, ay, animate) {
   apply(o, animate);
 }
 
+// After a video's real shape is known: keep its top-right corner, resize to the cap.
 function relayout(o) {
-  if (!anyAdjusted()) tile();
-  else if (o && !o.adjusted) placeFree(o, o.left + o.w / 2, o.top + o.h / 2, true);
+  if (!o || o.adjusted) return;
+  const right = o.left + o.w;
+  const { W, H } = view();
+  o.w = capWidth(o.aspect); o.h = o.w / o.aspect;
+  o.left = Math.max(PAD, right - o.w);
+  if (o.top + o.h > H - PAD) o.top = Math.max(PAD, H - PAD - o.h);
+  apply(o, true);
 }
-
-addEventListener('resize', () => { if (!anyAdjusted()) tile(); });
 
 /* ================= audio focus (iOS) ================= */
 let audible = null;
@@ -475,7 +493,7 @@ function openWin(it, x, y) {
   front(o);
 
   if (anyAdjusted()) placeFree(o, x, y, false);
-  else tile();
+  else placeStack(o, false);
 
   v.addEventListener('loadedmetadata', () => {
     if (!v.videoWidth) return;
@@ -838,7 +856,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-13-000114';
+const BUILD = '2026-11-13-000417';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
