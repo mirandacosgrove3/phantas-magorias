@@ -100,60 +100,78 @@
   .t.saved .txt { color: #2ee6d2; }
   .t.canceled .txt { color: #ff3b4a; }
 
-  /* ---- keyboard: a quiet type sheet ---- */
+  /* ---- keyboard: a glass rotary dial in the bottom-right ---- */
   #kb {
-    position: fixed; left: 0; right: 0; bottom: 0; z-index: 100000;
-    padding: 14px calc(18px + env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) calc(18px + env(safe-area-inset-left));
-    background: rgba(0,0,0,.82);
-    -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
-    border-top: .5px solid rgba(255,255,255,.28);
-    touch-action: none; overscroll-behavior: contain;
-    transform: translateY(105%); opacity: 0; pointer-events: none;
-    transition: transform .42s cubic-bezier(.2,.85,.25,1), opacity .25s ease;
+    position: fixed; z-index: 100000;
+    right: calc(26px + env(safe-area-inset-right));
+    bottom: calc(26px + env(safe-area-inset-bottom));
+    width: clamp(270px, 33vw, 370px); aspect-ratio: 1 / 1;
+    touch-action: none; pointer-events: none; opacity: 0;
+    transform: translate(40px, 40px) scale(.8); transform-origin: 100% 100%;
+    transition: transform .55s cubic-bezier(.2,.9,.25,1.12), opacity .3s ease;
     font-weight: 100;
   }
-  #kb.open { transform: none; opacity: 1; pointer-events: auto; }
-  .kb-top {
-    display: flex; align-items: baseline; justify-content: space-between;
-    padding: 2px 6px 12px; margin-bottom: 8px;
-    border-bottom: .5px solid rgba(255,255,255,.12);
-    font-size: 14px; letter-spacing: .14em; text-transform: lowercase;
+  #kb.open { opacity: 1; transform: none; pointer-events: auto; }
+  .dial {
+    position: absolute; inset: 0; border-radius: 50%; cursor: grab;
+    background: radial-gradient(circle at 34% 28%, rgba(255,255,255,.09), rgba(255,255,255,.015) 46%, rgba(0,0,0,.4) 100%);
+    -webkit-backdrop-filter: blur(16px) saturate(150%); backdrop-filter: blur(16px) saturate(150%);
+    box-shadow: inset 0 0 0 .5px rgba(255,255,255,.3), inset 0 1px 1px rgba(255,255,255,.2), 0 20px 70px rgba(0,0,0,.65);
   }
-  .kb-act { padding: 6px 4px; cursor: pointer; transition: opacity .12s; }
-  .kb-act.down { opacity: .45; }
-  .kb-cancel { color: #ff3b4a; }
-  .kb-add { color: rgba(255,255,255,.7); }
-  .kb-enter { color: #2ee6d2; text-shadow: 0 0 14px rgba(46,230,210,.55); }
-  .kb-body { display: flex; gap: 22px; align-items: stretch; }
-  .kb-keys { flex: 1; display: grid; grid-template-rows: repeat(5, 1fr); row-gap: 2px; }
-  .kb-row { display: flex; justify-content: space-between; }
-  .k {
-    flex: 1 1 0; height: 44px; display: flex; align-items: center; justify-content: center;
-    font-size: 22px; color: #fff; cursor: pointer; position: relative;
-    transition: color .1s, transform .1s;
+  .dial::before { content: ""; position: absolute; inset: 18%; border-radius: 50%; box-shadow: inset 0 0 0 .5px rgba(255,255,255,.14); pointer-events: none; }
+  .wedge {
+    position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
+    background: conic-gradient(from 297deg, rgba(255,111,181,0) 0deg, rgba(255,111,181,.42) 18deg, rgba(255,111,181,0) 36deg, transparent 36deg);
+    -webkit-mask: radial-gradient(circle, transparent 20%, #000 30%, #000 60%, transparent 78%);
+            mask: radial-gradient(circle, transparent 20%, #000 30%, #000 60%, transparent 78%);
   }
-  .k::after {
-    content: ""; position: absolute; left: 50%; bottom: 7px; width: 0; height: 1px;
-    background: #ff6fb5; transform: translateX(-50%); transition: width .12s;
+  .ri {
+    position: absolute; left: 0; top: 0; pointer-events: auto;
+    font-size: clamp(14px, 1.55vw, 19px); font-weight: 200; color: #fff; white-space: nowrap;
+    will-change: transform, opacity;
   }
-  .k.down { color: #ff6fb5; transform: translateY(-2px); }
-  .k.down::after { width: 14px; }
-  .k.word { font-size: 12px; letter-spacing: .14em; color: rgba(255,255,255,.55); flex-grow: 1.6; }
-  .k.space { flex-grow: 5; }
-  .k.on { color: #ff6fb5; }
-  .kb-emo { width: 330px; display: flex; flex-direction: column; border-left: .5px solid rgba(255,255,255,.12); padding-left: 18px; }
-  .emo-tabs { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px; letter-spacing: .14em; margin-bottom: 6px; }
-  .emo-tab { color: rgba(255,255,255,.45); padding: 6px 0; cursor: pointer; transition: color .15s; }
-  .emo-tab.on { color: #ff6fb5; }
-  .emo-grid { flex: 1; display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: 44px; column-gap: 10px; }
-  .emo-grid .k { justify-content: flex-start; font-size: 15px; white-space: nowrap; overflow: hidden; }
-  .emo-grid .k::after { left: 0; transform: none; }
-  #kb.open .k, #kb.open .kb-act, #kb.open .emo-tab {
-    animation: kin .34s ease backwards; animation-delay: calc(var(--i, 0) * 6ms + 60ms);
+  #kb.open .ri { animation: rin .5s ease backwards; animation-delay: calc(var(--i) * 9ms + 120ms); }
+  @keyframes rin { from { opacity: 0; } }
+  .hub {
+    position: absolute; left: 30%; top: 30%; width: 40%; height: 40%; border-radius: 50%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer;
+    background: radial-gradient(circle at 34% 26%, rgba(255,255,255,.17), rgba(255,255,255,.03) 50%, rgba(255,111,181,.07) 100%);
+    box-shadow: inset 0 0 0 .6px rgba(255,255,255,.42), inset 0 -10px 20px rgba(255,111,181,.11), 0 0 26px rgba(255,111,181,.13);
+    transition: transform .12s ease;
   }
+  .hub.down { transform: scale(.96); }
+  .hub.pop { animation: hubpop .34s ease; }
+  @keyframes hubpop { 35% { box-shadow: inset 0 0 0 .8px rgba(255,170,215,.9), inset 0 -10px 24px rgba(255,111,181,.3), 0 0 46px rgba(255,111,181,.5); } }
+  .hub-char { font-size: clamp(44px, 5.8vw, 66px); line-height: 1; color: #fff; }
+  .hub-char.long { font-size: clamp(13px, 1.4vw, 17px); white-space: nowrap; }
+  .hub-mode { margin-top: 6px; padding: 6px 10px; font-size: 13px; letter-spacing: .08em; color: rgba(255,255,255,.62); display: flex; align-items: center; gap: 6px; }
+  .hub-mode::before { content: ""; width: 5px; height: 5px; border-right: 1px solid #ff6fb5; border-bottom: 1px solid #ff6fb5; transform: translateY(-2px) rotate(45deg); }
+  .lens {
+    position: absolute; width: 19%; aspect-ratio: 1 / 1; border-radius: 50%; pointer-events: none;
+    transform: translate(-50%, -50%);
+    display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(circle at 32% 25%, rgba(255,255,255,.36), rgba(255,255,255,.06) 42%, rgba(255,111,181,.1) 100%);
+    -webkit-backdrop-filter: blur(3px) saturate(180%); backdrop-filter: blur(3px) saturate(180%);
+    box-shadow: inset 0 0 0 .7px rgba(255,255,255,.62), inset 0 -6px 12px rgba(255,111,181,.2), inset 0 4px 8px rgba(255,255,255,.16),
+                0 0 24px rgba(255,111,181,.42), 0 6px 18px rgba(0,0,0,.5);
+  }
+  .lens-char { font-size: clamp(26px, 3.3vw, 38px); color: #ff6fb5; text-shadow: 0 0 10px rgba(255,111,181,.6); }
+  .lens-char.tick { animation: ltick .24s cubic-bezier(.3,.8,.3,1.3); }
+  @keyframes ltick { from { transform: scale(.55); opacity: .25; filter: blur(2px); } }
+  .corner { position: absolute; padding: 8px; font-size: 12px; letter-spacing: .14em; cursor: pointer; transition: opacity .12s, transform .12s; }
+  .corner.down { opacity: .45; transform: scale(.94); }
+  .c-del { left: -6px; top: -6px; color: rgba(255,255,255,.75); }
+  .c-cancel { left: -6px; bottom: -6px; color: #ff3b4a; }
+  .c-enter { right: -6px; top: -6px; color: #2ee6d2; text-shadow: 0 0 12px rgba(46,230,210,.6); }
+  .c-add { right: -6px; bottom: -6px; color: rgba(255,255,255,.55); }
+  #kb.open .corner { animation: kin .45s ease backwards; animation-delay: .2s; }
   @keyframes kin { from { opacity: 0; transform: translateY(6px); } }
-  .emo-grid.swap .k { animation: kin .26s ease backwards; animation-delay: calc(var(--j, 0) * 22ms); }
-  @media (max-width: 760px) { .kb-emo { width: 220px; } .emo-grid { grid-template-columns: 1fr; } }
+  .fly {
+    position: fixed; z-index: 100001; pointer-events: none;
+    transform: translate(-50%, -50%); color: #ff6fb5; font-weight: 100;
+    font-size: clamp(40px, 5vw, 60px); text-shadow: 0 0 12px rgba(255,111,181,.6);
+    transition: transform .46s cubic-bezier(.3,.7,.2,1), opacity .46s ease-in;
+  }
 </style>
 </head>
 <body>
@@ -938,16 +956,22 @@ function startEdit(it) {
   openKb();
 }
 
+// Each insert is remembered as one piece, so delete removes a whole kaomoji at once.
 function typeKey(k) {
   if (!editing) return;
   editing.cutting = false;
-  if (k === '⌫') editing.buf = [...editing.buf].slice(0, -1).join('');
+  const parts = editing.parts || (editing.parts = []);
+  if (k === '⌫') {
+    const last = parts.pop();
+    editing.buf = last && editing.buf.endsWith(last)
+      ? editing.buf.slice(0, editing.buf.length - last.length)
+      : [...editing.buf].slice(0, -1).join('');
+  }
   else if (k === '⇧') { editing.shift = !editing.shift; updateShift(); return; }
-  else if (k === 'space') editing.buf += ' ';
   else {
-    let ch = k;
+    let ch = k === 'space' ? ' ' : k;
     if (editing.shift && ch.length === 1) { ch = ch.toUpperCase(); editing.shift = false; updateShift(); }
-    editing.buf += ch;
+    editing.buf += ch; parts.push(ch);
   }
   editing.txt.textContent = editing.buf;
 }
@@ -966,28 +990,33 @@ function finishEdit(save) {
   if (st !== 'collapsed') typeTo(it, true);
 }
 
-/* ---- the keyboard ---- */
+/* ---- the keyboard: a rotary dial ----
+   Drag around the ring with one finger (it spins with momentum, then settles),
+   the letter at the glass lens is the one selected, tap the centre to place it.
+   Tap a letter on the ring to spin straight to it. Tap the small label under the
+   big letter to switch abc / ABC / 123 / kaomoji. */
 const kb = document.getElementById('kb');
-const KB_ROWS = [
-  ['1','2','3','4','5','6','7','8','9','0'],
-  ['q','w','e','r','t','y','u','i','o','p'],
-  ['a','s','d','f','g','h','j','k','l',"'"],
-  ['shift','z','x','c','v','b','n','m','delete'],
-  ['-','_','space','.',',']
+const EMOTES = ['(◕‿◕)', '(✿◠‿◠)', '(*≧ω≦)', '٩(ˊᗜˋ*)و', '(ﾉ◕ヮ◕)ﾉ*:･ﾟ✧', 'ヽ(•‿•)ノ', '( ˘ ³˘)♥', '(づ｡◕‿‿◕｡)づ',
+  '(っ˘ω˘ς )', '( ˶ˆ꒳ˆ˵ )', '(╥﹏╥)', '(｡•́︿•̀｡)', '(ಥ﹏ಥ)', '(-_-) zzZ', '(╯°□°)╯︵ ┻━┻', '┬─┬ノ( º _ ºノ)',
+  'ಠ_ಠ', '(¬_¬)', '¯\\_(ツ)_/¯', '┐(￣ヘ￣)┌', '(⊙_⊙)', '(⌐■_■)', 'ʕ•ᴥ•ʔ', 'ʕ ᵔᴥᵔ ʔ', '(=^･ω･^=)',
+  'U・ᴥ・U', '꒰ ˶• ༝ •˶꒱', '༼ つ ◕_◕ ༽つ', '✧･ﾟ: *✧･ﾟ:*', '⋆｡°✩', '(ᵔ◡ᵔ)', '<(￣︶￣)>', ':)', ':(', ';)', '<3'];
+const LETTERS_TAIL = ['␣', '.', '-', '_', "'"];
+const MODES = [
+  { label: 'abc', items: [...'abcdefghijklmnopqrstuvwxyz', ...LETTERS_TAIL] },
+  { label: 'ABC', items: [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ', ...LETTERS_TAIL] },
+  { label: '123', items: [...'0123456789', '␣', '.', ',', '-', '_', '!', '?', '&', '@', '#', '(', ')', '/', ':', '+', '~', '*'] },
+  { label: '(◕‿◕)', items: EMOTES, emote: true }
 ];
-const EMOTES = {
-  happy: ['(◕‿◕)', '(✿◠‿◠)', '(*≧ω≦)', '٩(ˊᗜˋ*)و', '(ﾉ◕ヮ◕)ﾉ*:･ﾟ✧', '(•‿•)', 'ヽ(•‿•)ノ', '(＾▽＾)'],
-  love:  ['( ˘ ³˘)♥', '(づ｡◕‿‿◕｡)づ', '(♡μ_μ)', '(っ˘ω˘ς )', '♡(˃͈ દ ˂͈ ༶ )', '(´｡• ᵕ •｡`) ♡', '( ˶ˆ꒳ˆ˵ )', '(灬º‿º灬)♡'],
-  sad:   ['(╥﹏╥)', '(｡•́︿•̀｡)', '(っ- ‸ - ς)', '( ; ω ; )', '(ಥ﹏ಥ)', '(◞‸◟)', '(-_-) zzZ', '(︶︹︺)'],
-  mad:   ['(╯°□°)╯︵ ┻━┻', '┬─┬ノ( º _ ºノ)', 'ಠ_ಠ', '(ง\'̀-\'́)ง', '(ノಠ益ಠ)ノ', '(¬_¬)', '(＃`Д´)', '(눈_눈)'],
-  shrug: ['¯\\_(ツ)_/¯', '┐(￣ヘ￣)┌', '(・_・;)', '(⊙_⊙)', '(￣ω￣;)', '(⌐■_■)', '( ͡° ͜ʖ ͡°)', '(°ロ°)'],
-  pets:  ['ʕ•ᴥ•ʔ', 'ʕ ᵔᴥᵔ ʔ', '(=^･ω･^=)', '／(=･ x ･=)＼', 'U・ᴥ・U', '(•ө•)♡', '꒰ ˶• ༝ •˶꒱', '>°)))彡'],
-  bits:  ['༼ つ ◕_◕ ༽つ', '✧･ﾟ: *✧･ﾟ:*', '☆彡', '⋆｡°✩', '(ﾟ∀ﾟ)', '(ᵔ◡ᵔ)', '→_→', '<(￣︶￣)>']
-};
-let emoCat = 'happy';
+const SEL = -Math.PI * 3 / 4;                       // selection point: up-left, facing into the screen
+let mode = 0, rot = SEL, vel = 0, dialRAF = 0, selIdx = -1, dragging = false, snapTarget = null;
+let dial, ring, hub, hubChar, hubMode, lens, lensChar, ringEls = [];
 
-/* Tap = press on release, only if the finger didn't travel (so scrolling/sliding never types).
-   repeat: fire on press and keep firing while held (delete). */
+const TAU = Math.PI * 2;
+const wrapA = a => { a = (a + Math.PI) % TAU; if (a < 0) a += TAU; return a - Math.PI; };
+const curItems = () => MODES[mode].items;
+const ringLabel = it => MODES[mode].emote ? '•' : it;
+
+/* Tap = fire on release only if the finger didn't travel. repeat: fire on press and while held. */
 function pressable(el, fn, repeat) {
   let sx = 0, sy = 0, live = false, delay = null, rep = null;
   const stop = () => { el.classList.remove('down'); clearTimeout(delay); clearInterval(rep); };
@@ -995,85 +1024,192 @@ function pressable(el, fn, repeat) {
     e.preventDefault(); e.stopPropagation();
     sx = e.clientX; sy = e.clientY; live = true;
     el.classList.add('down');
-    if (repeat) { fn(); delay = setTimeout(() => { rep = setInterval(fn, 55); }, 380); }
+    if (repeat) { fn(); delay = setTimeout(() => { rep = setInterval(fn, 60); }, 380); }
   });
   el.addEventListener('pointermove', e => {
     if (live && Math.hypot(e.clientX - sx, e.clientY - sy) > 10) { live = false; stop(); }
   });
   el.addEventListener('pointerup', e => {
-    e.preventDefault();
+    e.preventDefault(); e.stopPropagation();
     if (live && !repeat) fn();
     live = false; stop();
   });
   ['pointercancel', 'pointerleave'].forEach(t => el.addEventListener(t, () => { live = false; stop(); }));
 }
 
+function buildRing() {
+  ringEls.forEach(el => el.remove());
+  ringEls = curItems().map((it, i) => {
+    const el = mk('ri', ringLabel(it));
+    el.dataset.i = i;
+    el.style.setProperty('--i', i);
+    ring.append(el);
+    return el;
+  });
+  selIdx = -1;
+}
+
+function drawDial() {
+  const D = kb.clientWidth, c = D / 2, R = c * 0.8;
+  const N = ringEls.length, step = TAU / N;
+  for (let i = 0; i < N; i++) {
+    const a = rot + i * step, d = wrapA(a - SEL);
+    const m = Math.exp(-((d / 0.3) ** 2));                          // magnification near the lens
+    const sc = 1 + 1.1 * m;
+    const fade = 0.18 + 0.82 * Math.max(0, 1 - Math.abs(d) / 2.3);
+    const under = 1 - 0.95 * Math.exp(-((d / 0.1) ** 2));          // the one under the lens hides behind it
+    const el = ringEls[i];
+    el.style.transform = `translate(${c + R * Math.cos(a)}px, ${c + R * Math.sin(a)}px) translate(-50%, -50%) scale(${sc})`;
+    el.style.opacity = (fade * under).toFixed(3);
+  }
+  lens.style.left = (c + R * Math.cos(SEL)) + 'px';
+  lens.style.top = (c + R * Math.sin(SEL)) + 'px';
+  const idx = ((Math.round((SEL - rot) / step) % N) + N) % N;
+  if (idx !== selIdx) { selIdx = idx; showSel(); }
+}
+
+function showSel() {
+  const it = curItems()[selIdx];
+  hubChar.textContent = it === '␣' ? '␣' : it;
+  hubChar.classList.toggle('long', !!MODES[mode].emote);
+  lensChar.textContent = ringLabel(it);
+  lensChar.classList.remove('tick'); void lensChar.offsetWidth; lensChar.classList.add('tick');
+}
+
+function spin() {
+  cancelAnimationFrame(dialRAF);
+  const step = TAU / ringEls.length;
+  const tick = () => {
+    if (dragging) { drawDial(); dialRAF = requestAnimationFrame(tick); return; }
+    if (snapTarget === null && Math.abs(vel) > 0.003) {          // momentum
+      rot += vel; vel *= 0.93;
+      drawDial(); dialRAF = requestAnimationFrame(tick); return;
+    }
+    let target = snapTarget;
+    if (target === null) target = SEL - Math.round((SEL - rot) / step) * step;
+    const diff = target - rot;
+    if (Math.abs(diff) > 0.0008) { rot += diff * 0.2; drawDial(); dialRAF = requestAnimationFrame(tick); }
+    else { rot = target; snapTarget = null; vel = 0; drawDial(); }
+  };
+  tick();
+}
+function spinTo(i) {
+  const step = TAU / ringEls.length;
+  let target = SEL - i * step;
+  target += TAU * Math.round((rot - target) / TAU);              // shortest way round
+  snapTarget = target; vel = 0; spin();
+}
+
+function placeSel() {
+  if (!editing || selIdx < 0) return;
+  const it = curItems()[selIdx];
+  const caret = document.querySelector('.t.editing .caret');
+  const from = hubChar.getBoundingClientRect(), to = caret && caret.getBoundingClientRect();
+  typeKey(it === '␣' ? 'space' : it);
+  hub.classList.remove('pop'); void hub.offsetWidth; hub.classList.add('pop');
+  if (to && it !== '␣') {
+    const f = mk('fly', it);
+    const fx = from.left + from.width / 2, fy = from.top + from.height / 2;
+    f.style.left = fx + 'px'; f.style.top = fy + 'px';
+    if (MODES[mode].emote) f.style.fontSize = '18px';
+    document.body.append(f);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      f.style.transform = `translate(${to.left - fx}px, ${to.top + to.height / 2 - fy}px) translate(-50%, -50%) scale(.35)`;
+      f.style.opacity = '0';
+    }));
+    setTimeout(() => f.remove(), 520);
+  }
+}
+
+function setMode(next) {
+  mode = (next + MODES.length) % MODES.length;
+  hubMode.textContent = MODES[mode].label;
+  buildRing();
+  rot = SEL + 0.9; snapTarget = SEL; spin();                     // new ring swirls into place
+}
+
 function buildKb() {
-  let i = 0;
-  const top = document.createElement('div'); top.className = 'kb-top';
-  const cancel = mk('kb-act kb-cancel', 'cancel');
-  const add = mk('kb-act kb-add', '+ add videos');
-  const enter = mk('kb-act kb-enter', 'enter');
-  [cancel, add, enter].forEach(el => el.style.setProperty('--i', i++));
+  dial = document.createElement('div'); dial.className = 'dial';
+  const wedge = document.createElement('div'); wedge.className = 'wedge';
+  ring = document.createElement('div'); ring.style.cssText = 'position:absolute;inset:0;';
+  hub = document.createElement('div'); hub.className = 'hub';
+  hubChar = mk('hub-char', 'a');
+  hubMode = mk('hub-mode', MODES[mode].label);
+  hub.append(hubChar, hubMode);
+  dial.append(wedge, ring, hub);
+  lens = document.createElement('div'); lens.className = 'lens';
+  lensChar = mk('lens-char', 'a');
+  lens.append(lensChar);
+
+  const del = mk('corner c-del', 'delete');
+  const cancel = mk('corner c-cancel', 'cancel');
+  const enter = mk('corner c-enter', 'enter');
+  const add = mk('corner c-add', '+ videos');
+  pressable(del, () => typeKey('⌫'), true);
   pressable(cancel, () => finishEdit(false));
   pressable(enter, () => finishEdit(true));
   // the file picker needs a real click to open on iPad
   add.addEventListener('pointerdown', e => { e.stopPropagation(); add.classList.add('down'); });
   add.addEventListener('pointerup', () => add.classList.remove('down'));
   add.addEventListener('click', e => { e.stopPropagation(); picker.click(); });
-  top.append(cancel, add, enter);
 
-  const body = document.createElement('div'); body.className = 'kb-body';
-  const keys = document.createElement('div'); keys.className = 'kb-keys';
-  for (const row of KB_ROWS) {
-    const r = document.createElement('div'); r.className = 'kb-row';
-    for (const k of row) {
-      const el = mk('k', k);
-      el.dataset.k = k;
-      if (k.length > 1) el.classList.add('word');
-      if (k === 'space') el.classList.add('space');
-      el.style.setProperty('--i', i++);
-      pressable(el, () => typeKey(k === 'shift' ? '⇧' : k === 'delete' ? '⌫' : k), k === 'delete');
-      r.append(el);
-    }
-    keys.append(r);
-  }
+  pressable(hub, placeSel);
+  pressable(hubMode, () => setMode(mode + 1));
 
-  const emo = document.createElement('div'); emo.className = 'kb-emo';
-  const tabs = document.createElement('div'); tabs.className = 'emo-tabs';
-  const grid = document.createElement('div'); grid.className = 'emo-grid';
-  const fill = () => {
-    grid.innerHTML = '';
-    grid.classList.remove('swap'); void grid.offsetWidth; grid.classList.add('swap');
-    EMOTES[emoCat].forEach((e, j) => {
-      const el = mk('k', e);
-      el.style.setProperty('--j', j);
-      pressable(el, () => typeKey(e));
-      grid.append(el);
-    });
-    tabs.querySelectorAll('.emo-tab').forEach(t => t.classList.toggle('on', t.dataset.c === emoCat));
+  kb.append(dial, lens, del, cancel, enter, add);
+  buildRing();
+
+  // one-finger spinning
+  let lastA = 0, lastT = 0, moved = 0, downItem = null, downX = 0, downY = 0;
+  const angleAt = e => {
+    const r = dial.getBoundingClientRect();
+    return Math.atan2(e.clientY - (r.top + r.height / 2), e.clientX - (r.left + r.width / 2));
   };
-  for (const c of Object.keys(EMOTES)) {
-    const t = mk('emo-tab', c); t.dataset.c = c;
-    t.style.setProperty('--i', i++);
-    pressable(t, () => { if (emoCat !== c) { emoCat = c; fill(); } });
-    tabs.append(t);
-  }
-  emo.append(tabs, grid);
-  body.append(keys, emo);
-  kb.append(top, body);
-  fill();
-}
-function updateShift() {
-  const on = editing && editing.shift;
-  kb.querySelectorAll('.k[data-k]').forEach(el => {
-    const k = el.dataset.k;
-    if (k === 'shift') el.classList.toggle('on', !!on);
-    else if (k.length === 1 && /[a-z]/.test(k)) el.textContent = on ? k.toUpperCase() : k;
+  dial.addEventListener('pointerdown', e => {
+    if (e.target.closest('.hub')) return;
+    e.preventDefault(); e.stopPropagation();
+    dial.setPointerCapture(e.pointerId);
+    dragging = true; moved = 0; vel = 0; snapTarget = null;
+    lastA = angleAt(e); lastT = performance.now();
+    downItem = e.target.closest('.ri'); downX = e.clientX; downY = e.clientY;
+    spin();
   });
+  dial.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const a = angleAt(e), d = wrapA(a - lastA), now = performance.now();
+    rot += d; moved += Math.abs(d);
+    vel = Math.max(-0.35, Math.min(0.35, d / Math.max(1, (now - lastT) / 16.7)));
+    lastA = a; lastT = now;
+  });
+  const up = e => {
+    if (!dragging) return;
+    dragging = false;
+    if (moved < 0.05) {
+      vel = 0;
+      const lr = lens.getBoundingClientRect();
+      if (Math.hypot(downX - (lr.left + lr.width / 2), downY - (lr.top + lr.height / 2)) < lr.width / 2) placeSel();
+      else if (downItem) spinTo(+downItem.dataset.i);
+    } else if (performance.now() - lastT > 80) vel = 0;           // finger stopped before lifting
+    spin();
+  };
+  dial.addEventListener('pointerup', up);
+  dial.addEventListener('pointercancel', up);
+  // trackpad / mouse wheel on a Mac
+  dial.addEventListener('wheel', e => {
+    e.preventDefault();
+    rot -= (e.deltaY + e.deltaX) * 0.0035; vel = 0; snapTarget = null;
+    clearTimeout(dial._w); drawDial();
+    dial._w = setTimeout(spin, 120);
+  }, { passive: false });
+  addEventListener('resize', () => { if (kb.classList.contains('open')) drawDial(); });
 }
-function openKb() { updateShift(); kb.classList.add('open'); kb.setAttribute('aria-hidden', 'false'); }
-function closeKb() { kb.classList.remove('open'); kb.setAttribute('aria-hidden', 'true'); }
+function updateShift() {}
+function openKb() {
+  kb.classList.add('open'); kb.setAttribute('aria-hidden', 'false');
+  buildRing();                                                   // replays the ring fade-in
+  rot = SEL + 1.4; vel = 0; snapTarget = SEL; spin();           // ring swirls into place
+}
+function closeKb() { kb.classList.remove('open'); kb.setAttribute('aria-hidden', 'true'); cancelAnimationFrame(dialRAF); }
 kb.addEventListener('pointerdown', e => e.stopPropagation());
 kb.addEventListener('touchmove', e => e.preventDefault(), { passive: false });   // never scroll the page from the keyboard
 buildKb();
@@ -1087,7 +1223,7 @@ document.addEventListener('keydown', e => {
   else if (e.key === 'Escape') finishEdit(false);
   else if (e.key === 'Backspace') typeKey('⌫');
   else if (e.key === ' ') typeKey('space');
-  else if (e.key.length === 1) { editing.cutting = false; editing.buf += e.key; editing.txt.textContent = editing.buf; }
+  else if (e.key.length === 1) typeKey(e.key);
 }, true);
 
 /* ================= spacebar = reset everything ================= */
@@ -1111,7 +1247,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-13-011517';
+const BUILD = '2026-11-13-044204';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
