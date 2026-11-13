@@ -148,13 +148,28 @@
   .hub-mode::before { content: ""; width: 5px; height: 5px; border-right: 1px solid #ff6fb5; border-bottom: 1px solid #ff6fb5; transform: translateY(-2px) rotate(45deg); }
   .hub-mode.down { color: #ff6fb5; }
   /* controls live to the left of the wheel, away from the spinning hand */
-  .bar { position: absolute; right: calc(100% + 22px); bottom: 7%; display: flex; align-items: center; gap: 20px; white-space: nowrap; }
+  .bar { position: absolute; right: calc(100% + 52px); bottom: 2%; display: flex; align-items: center; gap: 20px; white-space: nowrap; }
   .ctl { font-size: 15px; font-weight: 200; letter-spacing: .04em; color: rgba(255,255,255,.75); cursor: pointer; padding: 8px 0; transition: opacity .1s, transform .1s; }
   .ctl.down { opacity: .45; transform: scale(.96); }
   .ctl.cancel { color: #ff3b4a; }
   .ctl.add { color: rgba(255,255,255,.45); }
   .ctl.enter { color: #2ee6d2; text-shadow: 0 0 12px rgba(46,230,210,.55); }
-  #kb.open .bar { animation: kin .4s ease backwards; animation-delay: .18s; }
+  /* round icon buttons in the corners of the wheel's square, poking just past it */
+  .kbtn {
+    position: absolute; width: 46px; height: 46px; border-radius: 50%; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    background: #000; color: rgba(255,255,255,.8);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.24);
+    transition: color .15s, box-shadow .15s, background .15s, transform .1s;
+  }
+  .kbtn svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; }
+  .kbtn.down { transform: scale(.92); }
+  .kbtn.on { color: #ff6fb5; box-shadow: inset 0 0 0 1px #ff6fb5; background: rgba(255,111,181,.09); }
+  .kbtn.heart.on svg { fill: rgba(255,111,181,.35); }
+  .kbtn.k-del { top: -14px; right: -14px; }
+  .kbtn.heart { bottom: -14px; left: -14px; }
+  .kbtn.caps { bottom: -14px; right: -14px; }
+  #kb.open .bar, #kb.open .kbtn { animation: kin .4s ease backwards; animation-delay: .18s; }
   @keyframes kin { from { opacity: 0; } }
   .fly {
     position: fixed; z-index: 100001; pointer-events: none;
@@ -988,8 +1003,8 @@ function finishEdit(save) {
    The small label in the centre switches abc / ABC / kaomoji for the outer ring. */
 const kb = document.getElementById('kb');
 const T = (str) => ({ label: str, items: [...str] });
-const LOWER = ['abc','def','ghi','jkl','mno','pqr','stu','vwx','yz␣','.-_',"'!?"].map(T);
-const NUMS = ['123','456','789','0.,'].map(T);
+const LOWER = ['abc','def','ghi','jkl','mno','pqr','stu','vwx','yz'].map(T);
+const NUMS = ['123','456','789','0'].map(T);
 const MODES = [
   { label: 'abc', chunks: LOWER },
   { label: 'ABC', chunks: LOWER.map(c => T(c.label.toUpperCase())) },
@@ -1020,8 +1035,8 @@ const RINGS = {
   inner: { rIn: 38.5, rOut: 56, rc: 4, gap: 1.8, lab: 47.5, cls: 'num', chunks: () => NUMS }
 };
 for (const k in RINGS) Object.assign(RINGS[k], { rot: SEL, vel: 0, snap: null, raf: 0, wedges: [], labels: [], sel: -1, drag: false });
-let mode = 0, active = 'outer';
-let dial, svg, hub, trio, hubMode;
+let mode = 0, active = 'outer', caps = false, emote = false;
+let dial, svg, hub, trio, capsBtn, heartBtn;
 
 /* Tap = fire on release only if the finger didn't travel. repeat: fire on press and while held. */
 function pressable(el, fn, repeat) {
@@ -1169,9 +1184,11 @@ function placeChar(it, fromEl) {
   }
 }
 
+// caps (C) and heart (B) pick the outer ring's set: abc / ABC / kaomoji
 function setMode(next) {
   mode = (next + MODES.length) % MODES.length;
-  hubMode.textContent = MODES[mode].label;
+  capsBtn.classList.toggle('on', caps && !emote);
+  heartBtn.classList.toggle('on', emote);
   buildRing('outer');
   active = 'outer';
   const g = RINGS.outer;
@@ -1185,26 +1202,33 @@ function buildKb() {
   svg.setAttribute('viewBox', '0 0 200 200');
   hub = document.createElement('div'); hub.className = 'hub';
   trio = document.createElement('div'); trio.className = 'trio';
-  hubMode = mk('hub-mode', MODES[mode].label);
-  hub.append(trio, hubMode);
+  hub.append(trio);
   dial.append(svg, hub);
+
+  const icon = (cls, paths) => {
+    const b = document.createElement('div'); b.className = 'kbtn ' + cls;
+    b.innerHTML = `<svg viewBox="0 0 24 24">${paths}</svg>`;
+    return b;
+  };
+  const del = icon('k-del', '<path d="M9.5 6H19a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 19 18H9.5L4 12z"/><path d="M12.5 9.5l5 5M17.5 9.5l-5 5"/>');
+  heartBtn = icon('heart', '<path d="M12 19.5s-7.5-4.6-7.5-10.2A4.1 4.1 0 0 1 12 6.9a4.1 4.1 0 0 1 7.5 2.4c0 5.6-7.5 10.2-7.5 10.2z"/>');
+  capsBtn = icon('caps', '<path d="M12 4.5l7 7h-3.8v4.2H8.8v-4.2H5z"/><path d="M8.8 19.5h6.4"/>');
+  pressable(del, () => typeKey('⌫'), true);
+  pressable(capsBtn, () => { caps = !caps; emote = false; setMode(caps ? 1 : 0); });
+  pressable(heartBtn, () => { emote = !emote; setMode(emote ? 2 : (caps ? 1 : 0)); });
 
   const bar = document.createElement('div'); bar.className = 'bar';
   const enter = mk('ctl enter', 'OK');
-  const del = mk('ctl', 'delete');
   const cancel = mk('ctl cancel', 'cancel');
   const add = mk('ctl add', '+ videos');
-  bar.append(cancel, add, del, enter);
-  pressable(del, () => typeKey('⌫'), true);
+  bar.append(cancel, add, enter);
   pressable(cancel, () => finishEdit(false));
   pressable(enter, () => finishEdit(true));
   // the file picker needs a real click to open on iPad
   add.addEventListener('pointerdown', e => { e.stopPropagation(); add.classList.add('down'); });
   add.addEventListener('pointerup', () => add.classList.remove('down'));
   add.addEventListener('click', e => { e.stopPropagation(); picker.click(); });
-  pressable(hubMode, () => setMode(mode + 1));
-
-  kb.append(dial, bar);
+  kb.append(dial, bar, del, heartBtn, capsBtn);
   buildRing('inner'); buildRing('outer');
 
   // one-finger spinning of whichever ring you touch; a still tap on a segment spins to it
@@ -1310,7 +1334,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-13-051150';
+const BUILD = '2026-11-13-051908';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
