@@ -1544,7 +1544,7 @@ function buildXkb() {
   strip.addEventListener('pointercancel', up);
 
   const rows = [[...'1234567890'], [...'qwertyuiop'], [...'asdfghjkl'], [...'zxcvbnm']];
-  // top row: [fold handle] kaomoji strip, + videos, cancel
+  // top row: [fold handle] kaomoji strip, redo, backspace — bottom row ends with + videos, cancel
   const top = document.createElement('div'); top.className = 'xrow top';
   const addK = document.createElement('div'); addK.className = 'xk icon add';
   addK.innerHTML = '<svg viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10.5l5-3v9l-5-3"/><path d="M9.5 9.5v5M7 12h5"/></svg>';
@@ -1571,13 +1571,13 @@ function buildXkb() {
       pressable(ok, () => finishEdit(true));
       row.append(ok);
     }
-    if (ri === 3) {
-      row.append(iconKey('<path d="M18.5 9.5H9.5a4.5 4.5 0 0 0 0 9h3"/><path d="M15 6l3.5 3.5L15 13"/>', () => typeKey('↻')));
-      row.append(iconKey('<path d="M9.5 6H19a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 19 18H9.5L4 12z"/><path d="M12.5 9.5l5 5M17.5 9.5l-5 5"/>', () => typeKey('⌫'), true));
-    }
+    if (ri === 3) row.append(addK, cancelK);                    // + videos and cancel close out the bottom row
     xkb.append(row);
   });
-  top.append(strip, addK, cancelK);
+  // redo and backspace sit up top, beside the kaomoji strip
+  const redoK = iconKey('<path d="M18.5 9.5H9.5a4.5 4.5 0 0 0 0 9h3"/><path d="M15 6l3.5 3.5L15 13"/>', () => typeKey('↻'));
+  const delK = iconKey('<path d="M9.5 6H19a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 19 18H9.5L4 12z"/><path d="M12.5 9.5l5 5M17.5 9.5l-5 5"/>', () => typeKey('⌫'), true);
+  top.append(strip, redoK, delK);
   xkb.prepend(top);
 
   // handle in the top-left corner: tap, or push it back down-right, to fold the keyboard into the wheel
@@ -1718,7 +1718,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-13-055809';
+const BUILD = '2026-11-13-060436';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
