@@ -763,20 +763,35 @@ function drawAud() {
   const g = audCv.getContext('2d');
   if (!g) return;
   g.clearRect(0, 0, cw, ch);
-  g.strokeStyle = color; g.lineWidth = Math.max(1, dpr * 0.9);
-  g.shadowColor = color; g.shadowBlur = 4 * dpr;
+  g.strokeStyle = color; g.lineWidth = Math.max(1, dpr * 0.8);
+  g.shadowColor = color; g.shadowBlur = 5 * dpr;
   g.lineJoin = 'round'; g.lineCap = 'round';
+  // mirrored glowing bars, tallest in the middle, tapering to dots at the ends
   if (analyser) analyser.getByteTimeDomainData(td);
   phase += 0.05;
+  const gap = 2.6 * dpr;
+  const n = Math.max(7, Math.floor(cw / gap));
+  if (!drawAud.amps || drawAud.amps.length !== n) drawAud.amps = new Float32Array(n);
+  const amps = drawAud.amps;
+  const seg = Math.floor(td.length / n);
+  const cy = ch / 2, maxH = ch / 2 - g.lineWidth;
   g.beginPath();
-  const N = 48;
-  for (let i = 0; i <= N; i++) {
-    const f = i / N;
-    const idle = Math.sin(f * Math.PI * 4 + phase) * 0.12;                 // always a little alive
-    const live = analyser ? Math.max(-1, Math.min(1, (td[Math.floor(f * (td.length - 1))] - 128) / 128 * 2.4)) : Math.sin(f * Math.PI * 6 - phase * 1.7) * 0.18;
-    const env = Math.sin(f * Math.PI);                                      // taper the ends
-    const y = ch / 2 + (live + idle) * env * (ch / 2 - g.lineWidth * 2);
-    i ? g.lineTo(f * cw, y) : g.moveTo(f * cw, y);
+  for (let i = 0; i < n; i++) {
+    const f = (i + 0.5) / n;
+    let level;
+    if (analyser) {
+      let peak = 0;
+      for (let k = i * seg; k < (i + 1) * seg; k++) peak = Math.max(peak, Math.abs(td[k] - 128));
+      level = Math.min(1, (peak / 128) * 2.6);
+    } else {
+      level = 0.35 + 0.3 * Math.sin(f * 9 + phase * 2.1) * Math.sin(f * 4 - phase * 1.3);
+    }
+    level += 0.08 * Math.sin(f * 13 + phase * 3);                       // always a little alive
+    amps[i] = amps[i] * 0.55 + Math.max(0, level) * 0.45;                 // ease between frames
+    const env = Math.pow(Math.sin(f * Math.PI), 1.4);                     // taper toward the ends
+    const hh = Math.max(g.lineWidth * 0.6, amps[i] * env * maxH);
+    const x = (i + 0.5) * (cw / n);
+    g.moveTo(x, cy - hh); g.lineTo(x, cy + hh);
   }
   g.stroke();
 }
@@ -1073,7 +1088,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-13-004202';
+const BUILD = '2026-11-13-004943';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
