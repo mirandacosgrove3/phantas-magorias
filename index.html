@@ -100,84 +100,60 @@
   .t.saved .txt { color: #2ee6d2; }
   .t.canceled .txt { color: #ff3b4a; }
 
-  /* ---- keyboard: a precise rotary speller, bottom-right ---- */
+  /* ---- keyboard: a chunked rotary wheel, bottom-right ---- */
   #kb {
     position: fixed; z-index: 100000;
     right: calc(26px + env(safe-area-inset-right));
     bottom: calc(26px + env(safe-area-inset-bottom));
-    width: clamp(280px, 32vw, 360px); aspect-ratio: 1 / 1;
+    width: clamp(290px, 34vw, 380px); aspect-ratio: 1 / 1;
     touch-action: none; pointer-events: none; opacity: 0;
-    transform: scale(.92) rotate(-8deg); transform-origin: 50% 50%;
-    transition: transform .5s cubic-bezier(.2,.9,.25,1.05), opacity .25s ease;
+    transform: scale(.9) rotate(-10deg); transform-origin: 50% 50%;
+    transition: transform .5s cubic-bezier(.2,.9,.25,1.08), opacity .25s ease;
   }
   #kb.open { opacity: 1; transform: none; pointer-events: auto; }
-  .dial { position: absolute; inset: 0; border-radius: 50%; cursor: grab; background: #000; }
-  .track { position: absolute; inset: 0; border-radius: 50%; pointer-events: none; box-shadow: inset 0 0 0 1px rgba(255,255,255,.1); }
-  /* fine compass ticks around the edge; they turn with the ring */
-  .ticks, .ticks2 { position: absolute; inset: 1.5%; border-radius: 50%; pointer-events: none; will-change: transform; }
-  .ticks {
-    background: repeating-conic-gradient(rgba(255,255,255,.38) 0deg .45deg, transparent .45deg 5deg);
-    -webkit-mask: radial-gradient(closest-side, transparent 93.5%, #000 94%, #000 99%, transparent 99.5%);
-            mask: radial-gradient(closest-side, transparent 93.5%, #000 94%, #000 99%, transparent 99.5%);
+  .dial { position: absolute; inset: 0; border-radius: 50%; cursor: grab; }
+  .dial svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .wedge { fill: #1c1c1f; stroke: #1c1c1f; stroke-width: 9; stroke-linejoin: round; transition: fill .16s, stroke .16s; }
+  .wedge.sel { fill: #ff3d9a; stroke: #ff3d9a; }
+  .chunk {
+    position: absolute; left: 0; top: 0; pointer-events: none; white-space: nowrap;
+    font-weight: 700; font-size: clamp(15px, 1.7vw, 19px); letter-spacing: .05em; color: rgba(255,255,255,.85);
+    will-change: transform;
   }
-  .ticks2 {
-    background: repeating-conic-gradient(rgba(255,255,255,.85) 0deg .6deg, transparent .6deg 30deg);
-    -webkit-mask: radial-gradient(closest-side, transparent 90.5%, #000 91%, #000 99%, transparent 99.5%);
-            mask: radial-gradient(closest-side, transparent 90.5%, #000 91%, #000 99%, transparent 99.5%);
+  .chunk.sel { color: #fff; }
+  #kb.open .chunk { animation: rin .45s ease backwards; animation-delay: calc(var(--i) * 25ms + 100ms); }
+  @keyframes rin { from { opacity: 0; } }
+  .hub {
+    position: absolute; left: 27%; top: 27%; width: 46%; height: 46%; border-radius: 50%;
+    background: #000; box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.92);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
   }
-  .beam {
-    position: absolute; left: 50%; top: 50%; height: 16px; margin-top: -8px;
-    transform-origin: 0 50%; pointer-events: none;
-    background: linear-gradient(90deg, rgba(255,40,140,0) 0%, rgba(255,40,140,.95) 42%, rgba(255,40,140,.35) 78%, rgba(255,40,140,0) 100%);
-    -webkit-mask: linear-gradient(180deg, transparent, #000 30%, #000 70%, transparent);
-            mask: linear-gradient(180deg, transparent, #000 30%, #000 70%, transparent);
+  .trio { display: flex; gap: 2px; align-items: center; }
+  .trio .L {
+    min-width: 1.05em; padding: 4px 3px; text-align: center; cursor: pointer;
+    font-weight: 700; font-size: clamp(34px, 4.1vw, 48px); line-height: 1; color: #fff;
+    transition: color .1s, transform .1s;
   }
-  .tick { position: absolute; width: 2px; height: 16px; background: #ff3d9a; transform-origin: 50% 50%; pointer-events: none; box-shadow: 0 0 6px rgba(255,61,154,.8); }
-  .ri {
-    position: absolute; left: 0; top: 0; pointer-events: auto;
-    font-size: clamp(15px, 1.6vw, 19px); font-weight: 300; color: #fff; white-space: nowrap;
-    will-change: transform, opacity;
-  }
-  .ri.sel { color: #ff3d9a; font-weight: 400; }
-  .hub { position: absolute; left: 29%; top: 29%; width: 42%; height: 42%; border-radius: 50%; cursor: pointer; }
-  .hub .rim { position: absolute; inset: 0; border-radius: 50%; box-shadow: inset 0 0 0 1.5px #fff; pointer-events: none; }
-  /* knurled inner edge of the knob; turns with the ring */
-  .hub .knurl {
-    position: absolute; inset: 0; border-radius: 50%; pointer-events: none; will-change: transform;
-    background: repeating-conic-gradient(rgba(255,255,255,.3) 0deg .9deg, transparent .9deg 4deg);
-    -webkit-mask: radial-gradient(closest-side, transparent 87%, #000 88%, #000 95%, transparent 96%);
-            mask: radial-gradient(closest-side, transparent 87%, #000 88%, #000 95%, transparent 96%);
-  }
-  .hub .glow {
-    position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
-    background: conic-gradient(from var(--a, 275deg), rgba(255,40,140,0) 0deg, rgba(255,40,140,.55) 40deg, rgba(255,40,140,0) 80deg, transparent 80deg);
-    -webkit-mask: radial-gradient(circle, transparent 38%, #000 70%); mask: radial-gradient(circle, transparent 38%, #000 70%);
-  }
-  .hub .face { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-  .hub.down .rim { box-shadow: inset 0 0 0 1.5px #ff3d9a; }
-  .hub.pop .rim { animation: rimpop .3s ease; }
-  @keyframes rimpop { 30% { box-shadow: inset 0 0 0 2.5px #ff3d9a, 0 0 18px rgba(255,61,154,.6); } }
-  .hub-char { font-size: clamp(50px, 6.2vw, 72px); line-height: 1; font-weight: 300; color: #fff; }
-  .hub-char.tick2 { animation: htick .2s ease; }
-  @keyframes htick { from { opacity: .2; transform: translateY(4px); } }
-  .hub-char.long { font-size: clamp(13px, 1.4vw, 17px); white-space: nowrap; font-weight: 400; }
-  .hub-mode { margin-top: 6px; padding: 6px 10px; font-size: 15px; font-weight: 300; color: rgba(255,255,255,.75); display: flex; align-items: center; gap: 6px; cursor: pointer; }
-  .hub-mode::before { content: ""; width: 6px; height: 6px; border-right: 1.5px solid #ff3d9a; border-bottom: 1.5px solid #ff3d9a; transform: translateY(-2px) rotate(45deg); }
-  /* controls live to the left of the dial, away from the spinning hand */
+  .trio .L.down { color: #ff3d9a; transform: scale(.9); }
+  .trio .L.in { animation: flipin .34s cubic-bezier(.2,.9,.3,1.25) backwards; animation-delay: calc(var(--k) * 45ms); }
+  @keyframes flipin { from { opacity: 0; transform: perspective(220px) rotateX(-85deg) translateY(-8px); } }
+  .trio.emo { flex-direction: column; gap: 0; }
+  .trio.emo .L { min-width: 0; padding: 5px 8px; font-size: clamp(12px, 1.3vw, 15px); font-weight: 500; }
+  .hub-mode { margin-top: 2px; padding: 6px 10px; font-size: 12px; font-weight: 700; letter-spacing: .12em; color: rgba(255,255,255,.45); cursor: pointer; }
+  .hub-mode.down { color: #ff3d9a; }
+  /* controls live to the left of the wheel, away from the spinning hand */
   .bar { position: absolute; right: calc(100% + 22px); bottom: 7%; display: flex; align-items: center; gap: 20px; white-space: nowrap; }
-  .ctl { font-size: 15px; font-weight: 400; color: rgba(255,255,255,.8); cursor: pointer; padding: 8px 0; transition: opacity .1s, transform .1s; }
+  .ctl { font-size: 15px; font-weight: 700; color: rgba(255,255,255,.8); cursor: pointer; padding: 8px 0; transition: opacity .1s, transform .1s; }
   .ctl.down { opacity: .45; transform: scale(.96); }
   .ctl.cancel { color: #ff3b4a; }
   .ctl.add { color: rgba(255,255,255,.5); }
   .ctl.enter { color: #00211e; background: #2ee6d2; padding: 9px 22px; border-radius: 999px; }
-  #kb.open .ri { animation: rin .45s ease backwards; animation-delay: calc(var(--i) * 8ms + 80ms); }
-  @keyframes rin { from { opacity: 0; } }
   #kb.open .bar { animation: kin .4s ease backwards; animation-delay: .18s; }
   @keyframes kin { from { opacity: 0; } }
   .fly {
     position: fixed; z-index: 100001; pointer-events: none;
-    transform: translate(-50%, -50%); color: #ff3d9a; font-weight: 300;
-    font-size: clamp(40px, 5vw, 60px);
+    transform: translate(-50%, -50%); color: #ff3d9a; font-weight: 700;
+    font-size: clamp(34px, 4.1vw, 48px);
     transition: transform .42s cubic-bezier(.3,.7,.2,1), opacity .42s ease-in;
   }
 </style>
@@ -998,31 +974,42 @@ function finishEdit(save) {
   if (st !== 'collapsed') typeTo(it, true);
 }
 
-/* ---- the keyboard: a rotary dial ----
-   Drag around the ring with one finger (it spins with momentum, then settles),
-   the letter at the pink pointer is the one selected; tap the centre (or that letter) to place it.
-   Tap a letter on the ring to spin straight to it. Tap the small label under the
-   big letter to switch abc / ABC / 123 / kaomoji. */
+/* ---- the keyboard: a chunked rotary wheel ----
+   Rounded segments around a wheel, three characters per segment (like phone keys).
+   Spin the wheel with one finger (momentum, then it settles) or tap a segment;
+   the pink segment's three characters pop up big in the centre - tap one to place it.
+   The small label under them switches abc / ABC / 123 / kaomoji. */
 const kb = document.getElementById('kb');
-const EMOTES = ['(◕‿◕)', '(✿◠‿◠)', '(*≧ω≦)', '٩(ˊᗜˋ*)و', '(ﾉ◕ヮ◕)ﾉ*:･ﾟ✧', 'ヽ(•‿•)ノ', '( ˘ ³˘)♥', '(づ｡◕‿‿◕｡)づ',
-  '(っ˘ω˘ς )', '( ˶ˆ꒳ˆ˵ )', '(╥﹏╥)', '(｡•́︿•̀｡)', '(ಥ﹏ಥ)', '(-_-) zzZ', '(╯°□°)╯︵ ┻━┻', '┬─┬ノ( º _ ºノ)',
-  'ಠ_ಠ', '(¬_¬)', '¯\\_(ツ)_/¯', '┐(￣ヘ￣)┌', '(⊙_⊙)', '(⌐■_■)', 'ʕ•ᴥ•ʔ', 'ʕ ᵔᴥᵔ ʔ', '(=^･ω･^=)',
-  'U・ᴥ・U', '꒰ ˶• ༝ •˶꒱', '༼ つ ◕_◕ ༽つ', '✧･ﾟ: *✧･ﾟ:*', '⋆｡°✩', '(ᵔ◡ᵔ)', '<(￣︶￣)>', ':)', ':(', ';)', '<3'];
-const LETTERS_TAIL = ['␣', '.', '-', '_', "'"];
+const T = (str) => ({ label: str, items: [...str] });
+const LOWER = ['abc','def','ghi','jkl','mno','pqr','stu','vwx','yz␣','.-_',"'!?"].map(T);
 const MODES = [
-  { label: 'abc', items: [...'abcdefghijklmnopqrstuvwxyz', ...LETTERS_TAIL] },
-  { label: 'ABC', items: [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ', ...LETTERS_TAIL] },
-  { label: '123', items: [...'0123456789', '␣', '.', ',', '-', '_', '!', '?', '&', '@', '#', '(', ')', '/', ':', '+', '~', '*'] },
-  { label: '(◕‿◕)', items: EMOTES, emote: true }
+  { label: 'abc', chunks: LOWER },
+  { label: 'ABC', chunks: LOWER.map(c => T(c.label.toUpperCase())) },
+  { label: '123', chunks: ['123','456','789','0.,','!?&','@#+','()/',':~*'].map(T) },
+  { label: '(◕‿◕)', emote: true, chunks: [
+    { label: 'joy',  items: ['(◕‿◕)', '(✿◠‿◠)', '(*≧ω≦)'] },
+    { label: 'yay',  items: ['٩(ˊᗜˋ*)و', '(ﾉ◕ヮ◕)ﾉ*:･ﾟ✧', 'ヽ(•‿•)ノ'] },
+    { label: 'love', items: ['( ˘ ³˘)♥', '(づ｡◕‿‿◕｡)づ', '<3'] },
+    { label: 'soft', items: ['(っ˘ω˘ς )', '( ˶ˆ꒳ˆ˵ )', '(ᵔ◡ᵔ)'] },
+    { label: 'cry',  items: ['(╥﹏╥)', '(｡•́︿•̀｡)', '(ಥ﹏ಥ)'] },
+    { label: 'mad',  items: ['(╯°□°)╯︵ ┻━┻', '┬─┬ノ( º _ ºノ)', '(＃`Д´)'] },
+    { label: 'side', items: ['ಠ_ಠ', '(¬_¬)', '(-_-) zzZ'] },
+    { label: 'meh',  items: ['¯\\_(ツ)_/¯', '┐(￣ヘ￣)┌', '(⊙_⊙)'] },
+    { label: 'cool', items: ['(⌐■_■)', '<(￣︶￣)>', '༼ つ ◕_◕ ༽つ'] },
+    { label: 'bear', items: ['ʕ•ᴥ•ʔ', 'ʕ ᵔᴥᵔ ʔ', 'U・ᴥ・U'] },
+    { label: 'cat',  items: ['(=^･ω･^=)', '꒰ ˶• ༝ •˶꒱', '／(=･ x ･=)＼'] },
+    { label: '✧',    items: ['✧･ﾟ: *✧･ﾟ:*', '⋆｡°✩', '☆彡'] },
+    { label: ':)',   items: [':)', ':(', ';)'] }
+  ] }
 ];
-const SEL = -Math.PI * 3 / 4;                       // selection point: up-left, facing into the screen
+const SEL = -Math.PI * 3 / 4;                       // the selected segment sits up-left, facing the screen
 let mode = 0, rot = SEL, vel = 0, dialRAF = 0, selIdx = -1, dragging = false, snapTarget = null;
-let dial, ring, hub, hubChar, hubMode, hubGlow, beam, tickEl, ticksA, ticksB, knurl, ringEls = [];
+let dial, svg, hub, trio, hubMode, wedges = [], labels = [];
 
 const TAU = Math.PI * 2;
+const SVGNS = 'http://www.w3.org/2000/svg';
 const wrapA = a => { a = (a + Math.PI) % TAU; if (a < 0) a += TAU; return a - Math.PI; };
-const curItems = () => MODES[mode].items;
-const ringLabel = it => MODES[mode].emote ? '·' : it;
+const chunks = () => MODES[mode].chunks;
 
 /* Tap = fire on release only if the finger didn't travel. repeat: fire on press and while held. */
 function pressable(el, fn, repeat) {
@@ -1045,59 +1032,67 @@ function pressable(el, fn, repeat) {
   ['pointercancel', 'pointerleave'].forEach(t => el.addEventListener(t, () => { live = false; stop(); }));
 }
 
-function buildRing() {
-  ringEls.forEach(el => el.remove());
-  ringEls = curItems().map((it, i) => {
-    const el = mk('ri', ringLabel(it));
-    el.dataset.i = i;
+// one rounded segment, centred on angle 0 (each is rotated into place)
+function wedgePath(step) {
+  const sw = 4.5, gap = 1.6;                          // half the stroke (rounding) + half the gap between segments
+  const rIn = 50 + sw, rOut = 99 - sw;
+  const hIn = step / 2 - (gap + sw) / rIn, hOut = step / 2 - (gap + sw) / rOut;
+  const P = (r, a) => `${(100 + r * Math.cos(a)).toFixed(2)} ${(100 + r * Math.sin(a)).toFixed(2)}`;
+  return `M ${P(rOut, -hOut)} A ${rOut} ${rOut} 0 0 1 ${P(rOut, hOut)} L ${P(rIn, hIn)} A ${rIn} ${rIn} 0 0 0 ${P(rIn, -hIn)} Z`;
+}
+
+function buildWheel() {
+  wedges.forEach(w => w.remove()); labels.forEach(l => l.remove());
+  const N = chunks().length, step = TAU / N, d = wedgePath(step);
+  wedges = chunks().map(() => {
+    const p = document.createElementNS(SVGNS, 'path');
+    p.setAttribute('d', d); p.setAttribute('class', 'wedge');
+    svg.append(p); return p;
+  });
+  labels = chunks().map((ch, i) => {
+    const el = mk('chunk', ch.label);
     el.style.setProperty('--i', i);
-    ring.append(el);
+    dial.insertBefore(el, hub);
     return el;
   });
   selIdx = -1;
 }
 
 function drawDial() {
-  const D = kb.clientWidth, c = D / 2, R = c * 0.82;
-  const N = ringEls.length, step = TAU / N;
+  const D = kb.clientWidth, c = D / 2, N = wedges.length, step = TAU / N;
+  const rLab = c * 0.745;
   for (let i = 0; i < N; i++) {
     const a = rot + i * step, d = wrapA(a - SEL);
-    const m = Math.exp(-((d / 0.22) ** 2));                          // slight swell near the pointer
-    const fade = 0.3 + 0.7 * Math.max(0, 1 - Math.abs(d) / 2.8);
-    const el = ringEls[i];
-    el.style.transform = `translate(${c + R * Math.cos(a)}px, ${c + R * Math.sin(a)}px) translate(-50%, -50%) scale(${1 + 0.55 * m})`;
-    el.style.opacity = fade.toFixed(3);
+    const m = Math.exp(-((d / (step * 0.6)) ** 2));                    // the selected segment lifts outward a little
+    wedges[i].setAttribute('transform', `rotate(${(a * 180 / Math.PI).toFixed(3)} 100 100) translate(${(3.5 * m).toFixed(2)} 0)`);
+    const r = rLab + 3.5 * m * D / 200;
+    labels[i].style.transform = `translate(${c + r * Math.cos(a)}px, ${c + r * Math.sin(a)}px) translate(-50%, -50%) scale(${1 + 0.08 * m})`;
   }
-  // pointer: beam from the hub edge out to the ring, and a tick just outside the ring
-  const hubR = D * 0.21;
-  beam.style.width = (R - hubR + 4) + 'px';
-  beam.style.transform = `rotate(${SEL}rad) translateX(${hubR - 6}px)`;
-  const tr = R + D * 0.1;
-  tickEl.style.left = (c + tr * Math.cos(SEL) - 1) + 'px';
-  tickEl.style.top = (c + tr * Math.sin(SEL) - 8) + 'px';
-  tickEl.style.transform = `rotate(${SEL + Math.PI / 2}rad)`;
-  hubGlow.style.setProperty('--a', (SEL * 180 / Math.PI + 90 - 40) + 'deg');
-  const turn = `rotate(${rot}rad)`;                                 // ticks + knurl turn with the ring
-  ticksA.style.transform = turn; ticksB.style.transform = turn; knurl.style.transform = turn;
   const idx = ((Math.round((SEL - rot) / step) % N) + N) % N;
   if (idx !== selIdx) { selIdx = idx; showSel(); }
 }
 
 function showSel() {
-  const it = curItems()[selIdx];
-  ringEls.forEach((el, i) => el.classList.toggle('sel', i === selIdx));
-  hubChar.textContent = it;
-  hubChar.classList.toggle('long', !!MODES[mode].emote);
-  hubChar.classList.remove('tick2'); void hubChar.offsetWidth; hubChar.classList.add('tick2');
+  wedges.forEach((w, i) => w.classList.toggle('sel', i === selIdx));
+  labels.forEach((l, i) => l.classList.toggle('sel', i === selIdx));
+  const ch = chunks()[selIdx];
+  trio.innerHTML = '';
+  trio.classList.toggle('emo', !!MODES[mode].emote);
+  ch.items.forEach((it, k) => {
+    const L = mk('L in', it);
+    L.style.setProperty('--k', k);
+    pressable(L, () => placeChar(it, L));
+    trio.append(L);
+  });
 }
 
 function spin() {
   cancelAnimationFrame(dialRAF);
-  const step = TAU / ringEls.length;
+  const step = TAU / wedges.length;
   const tick = () => {
     if (dragging) { drawDial(); dialRAF = requestAnimationFrame(tick); return; }
     if (snapTarget === null && Math.abs(vel) > 0.003) {          // momentum
-      rot += vel; vel *= 0.93;
+      rot += vel; vel *= 0.92;
       drawDial(); dialRAF = requestAnimationFrame(tick); return;
     }
     let target = snapTarget;
@@ -1109,58 +1104,47 @@ function spin() {
   tick();
 }
 function spinTo(i) {
-  const step = TAU / ringEls.length;
+  const step = TAU / wedges.length;
   let target = SEL - i * step;
   target += TAU * Math.round((rot - target) / TAU);              // shortest way round
   snapTarget = target; vel = 0; spin();
 }
 
-function placeSel() {
-  if (!editing || selIdx < 0) return;
-  const it = curItems()[selIdx];
+function placeChar(it, fromEl) {
+  if (!editing) return;
   const caret = document.querySelector('.t.editing .caret');
-  const from = hubChar.getBoundingClientRect(), to = caret && caret.getBoundingClientRect();
+  const from = fromEl.getBoundingClientRect(), to = caret && caret.getBoundingClientRect();
   typeKey(it === '␣' ? 'space' : it);
-  hub.classList.remove('pop'); void hub.offsetWidth; hub.classList.add('pop');
   if (to && it !== '␣') {
     const f = mk('fly', it);
     const fx = from.left + from.width / 2, fy = from.top + from.height / 2;
     f.style.left = fx + 'px'; f.style.top = fy + 'px';
-    if (MODES[mode].emote) f.style.fontSize = '18px';
+    if (MODES[mode].emote) f.style.fontSize = '16px';
     document.body.append(f);
     requestAnimationFrame(() => requestAnimationFrame(() => {
-      f.style.transform = `translate(${to.left - fx}px, ${to.top + to.height / 2 - fy}px) translate(-50%, -50%) scale(.35)`;
+      f.style.transform = `translate(${to.left - fx}px, ${to.top + to.height / 2 - fy}px) translate(-50%, -50%) scale(.4)`;
       f.style.opacity = '0';
     }));
-    setTimeout(() => f.remove(), 520);
+    setTimeout(() => f.remove(), 480);
   }
 }
 
 function setMode(next) {
   mode = (next + MODES.length) % MODES.length;
   hubMode.textContent = MODES[mode].label;
-  buildRing();
-  rot = SEL + 0.9; snapTarget = SEL; spin();                     // new ring swirls into place
+  buildWheel();
+  rot = SEL + 0.9; snapTarget = SEL; spin();                     // new set swirls into place
 }
 
 function buildKb() {
   dial = document.createElement('div'); dial.className = 'dial';
-  const t2 = document.createElement('div'); t2.className = 'track';
-  ticksA = document.createElement('div'); ticksA.className = 'ticks';
-  ticksB = document.createElement('div'); ticksB.className = 'ticks2';
-  beam = document.createElement('div'); beam.className = 'beam';
-  tickEl = document.createElement('div'); tickEl.className = 'tick';
-  ring = document.createElement('div'); ring.style.cssText = 'position:absolute;inset:0;';
+  svg = document.createElementNS(SVGNS, 'svg');
+  svg.setAttribute('viewBox', '0 0 200 200');
   hub = document.createElement('div'); hub.className = 'hub';
-  hubGlow = document.createElement('div'); hubGlow.className = 'glow';
-  knurl = document.createElement('div'); knurl.className = 'knurl';
-  const rim = document.createElement('div'); rim.className = 'rim';
-  const face = document.createElement('div'); face.className = 'face';
-  hubChar = mk('hub-char', 'a');
+  trio = document.createElement('div'); trio.className = 'trio';
   hubMode = mk('hub-mode', MODES[mode].label);
-  face.append(hubChar, hubMode);
-  hub.append(hubGlow, knurl, rim, face);
-  dial.append(t2, ticksA, ticksB, beam, ring, hub, tickEl);
+  hub.append(trio, hubMode);
+  dial.append(svg, hub);
 
   const bar = document.createElement('div'); bar.className = 'bar';
   const enter = mk('ctl enter', 'OK');
@@ -1175,15 +1159,13 @@ function buildKb() {
   add.addEventListener('pointerdown', e => { e.stopPropagation(); add.classList.add('down'); });
   add.addEventListener('pointerup', () => add.classList.remove('down'));
   add.addEventListener('click', e => { e.stopPropagation(); picker.click(); });
-
-  pressable(hub, placeSel);
   pressable(hubMode, () => setMode(mode + 1));
 
   kb.append(dial, bar);
-  buildRing();
+  buildWheel();
 
-  // one-finger spinning
-  let lastA = 0, lastT = 0, moved = 0, downItem = null, downX = 0, downY = 0;
+  // one-finger spinning; a still tap on a segment spins to it
+  let lastA = 0, lastT = 0, moved = 0, downA = 0;
   const angleAt = e => {
     const r = dial.getBoundingClientRect();
     return Math.atan2(e.clientY - (r.top + r.height / 2), e.clientX - (r.left + r.width / 2));
@@ -1193,27 +1175,26 @@ function buildKb() {
     e.preventDefault(); e.stopPropagation();
     dial.setPointerCapture(e.pointerId);
     dragging = true; moved = 0; vel = 0; snapTarget = null;
-    lastA = angleAt(e); lastT = performance.now();
-    downItem = e.target.closest('.ri'); downX = e.clientX; downY = e.clientY;
+    lastA = downA = angleAt(e); lastT = performance.now();
     spin();
   });
   dial.addEventListener('pointermove', e => {
     if (!dragging) return;
     const a = angleAt(e), d = wrapA(a - lastA), now = performance.now();
     rot += d; moved += Math.abs(d);
-    vel = Math.max(-0.35, Math.min(0.35, d / Math.max(1, (now - lastT) / 16.7)));
+    vel = Math.max(-0.3, Math.min(0.3, d / Math.max(1, (now - lastT) / 16.7)));
     lastA = a; lastT = now;
   });
-  const up = e => {
+  const up = () => {
     if (!dragging) return;
     dragging = false;
     if (moved < 0.05) {
       vel = 0;
-      if (downItem) {
-        if (+downItem.dataset.i === selIdx) placeSel();             // tap the selected letter = place it
-        else spinTo(+downItem.dataset.i);
-      }
-    } else if (performance.now() - lastT > 80) vel = 0;           // finger stopped before lifting
+      const N = wedges.length, step = TAU / N;
+      spinTo(((Math.round((downA - rot) / step) % N) + N) % N);
+      return;
+    }
+    if (performance.now() - lastT > 80) vel = 0;                 // finger stopped before lifting
     spin();
   };
   dial.addEventListener('pointerup', up);
@@ -1221,7 +1202,7 @@ function buildKb() {
   // trackpad / mouse wheel on a Mac
   dial.addEventListener('wheel', e => {
     e.preventDefault();
-    rot -= (e.deltaY + e.deltaX) * 0.0035; vel = 0; snapTarget = null;
+    rot -= (e.deltaY + e.deltaX) * 0.003; vel = 0; snapTarget = null;
     clearTimeout(dial._w); drawDial();
     dial._w = setTimeout(spin, 120);
   }, { passive: false });
@@ -1230,8 +1211,8 @@ function buildKb() {
 function updateShift() {}
 function openKb() {
   kb.classList.add('open'); kb.setAttribute('aria-hidden', 'false');
-  buildRing();                                                   // replays the ring fade-in
-  rot = SEL + 1.4; vel = 0; snapTarget = SEL; spin();           // ring swirls into place
+  buildWheel();                                                  // replays the label fade-in
+  rot = SEL + 1.2; vel = 0; snapTarget = SEL; spin();            // wheel swirls into place
 }
 function closeKb() { kb.classList.remove('open'); kb.setAttribute('aria-hidden', 'true'); cancelAnimationFrame(dialRAF); }
 kb.addEventListener('pointerdown', e => e.stopPropagation());
@@ -1271,7 +1252,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-13-045343';
+const BUILD = '2026-11-13-050035';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
