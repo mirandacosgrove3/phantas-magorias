@@ -433,10 +433,9 @@ let audible = null;
 function giveSound(o) {
   if (lockWin && lockWin !== o) { setMuted(o, true); return; }   // sound is locked elsewhere
   audible = o;
-  if (!IOS) { setMuted(o, false); routeVideo(o); return; }
+  if (!IOS) { setMuted(o, false); return; }
   for (const p of wins) if (p !== o) setMuted(p, true);
   setMuted(o, false);
-  routeVideo(o);
 }
 
 /* ================= title animation ================= */
@@ -645,127 +644,113 @@ function openWin(it, x, y) {
   }
 }
 
-/* ================= edge visualizer (experimental) =================
-   Flowing glow ribbons living along the bottom edge and up the right edge, driven by
-   whatever audio is audible. Mostly pink / turquoise / red on pure black, white sparks,
-   and every so often a rainbow ribbon sweeps through. */
+/* ================= edge glass (experimental) =================
+   The bottom and right edges act like a sheet of liquid glass: open videos throw soft,
+   blurred, gently rippling reflections onto them. Reflections are drawn from tiny copies
+   of each frame, so they're naturally soft and cheap. */
 const viz = document.createElement('canvas');
 viz.id = 'viz';
 document.body.prepend(viz);
 const vg = viz.getContext('2d');
-let VW = 0, VH = 0;
+const lo = document.createElement('canvas');
+const lg = lo.getContext('2d');
+const rc = document.createElement('canvas');
+const rg = rc.getContext('2d');
+let VW = 0, VH = 0, vframe = 0;
 function sizeViz() { VW = viz.width = Math.round(innerWidth); VH = viz.height = Math.round(innerHeight); }
 sizeViz();
 addEventListener('resize', sizeViz);
 
-const VCOL = [[255, 111, 181], [46, 230, 210], [255, 59, 74], [255, 111, 181], [255, 255, 255]];
-const fd = new Uint8Array(512);
-let vt = 0, lvl = 0, bass = 0, mid = 0, high = 0, beat = 0, bassAvg = 0.05;
-let rainbow = 0, nextRainbow = performance.now() + 9000, vframe = 0;
-
-function audioFeatures() {
-  let b = 0, m = 0, h = 0;
-  const live = masterAn && wins.some(o => !o.v.muted && !o.v.paused);
-  if (live) {
-    masterAn.getByteFrequencyData(fd);
-    for (let i = 1; i < 10; i++) b += fd[i]; b /= 9 * 255;
-    for (let i = 10; i < 80; i++) m += fd[i]; m /= 70 * 255;
-    for (let i = 80; i < 300; i++) h += fd[i]; h /= 220 * 255;
-  }
-  const l = b * 0.5 + m * 0.35 + h * 0.15;
-  lvl += (l - lvl) * 0.12; bass += (b - bass) * 0.3; mid += (m - mid) * 0.18; high += (h - high) * 0.2;
-  bassAvg = bassAvg * 0.97 + b * 0.03;
-  if (b > bassAvg * 1.35 && b > 0.22) beat = 1;
-  beat *= 0.9;
-}
-const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
-
-// one ribbon; side 'b' runs along the bottom, 'r' runs up the right side
-function ribbon(side, i, n, energy, strokeFor) {
-  const bottom = side === 'b';
-  const len = bottom ? VW : VH;
-  const base = bottom ? VH * 0.885 : VW * 0.93;
-  const spread = (bottom ? VH : VW) * 0.06;
-  vg.beginPath();
-  for (let p = -30; p <= len + 30; p += 10) {
-    const u = p / len;
-    let off = Math.sin(u * 5.5 + vt * 0.7 + i * 1.9) * spread * (0.45 + energy * 0.85)
-            + Math.sin(u * 12.5 - vt * 1.25 + i * 0.8) * spread * 0.35 * (0.3 + energy)
-            + Math.sin(u * 27 + vt * 2.2 + i) * spread * 0.12 * high * 3
-            + (i - (n - 1) / 2) * spread * 0.28;
-    // both bands curl toward the bottom-right corner so they read as one flow
-    const curl = Math.pow(bottom ? u : u, 5) * (bottom ? VH * 0.09 : VW * 0.05);
-    if (bottom) { const y = base + off - curl; p === -30 ? vg.moveTo(p, y) : vg.lineTo(p, y); }
-    else { const x = base + off - curl; p === -30 ? vg.moveTo(x, p) : vg.lineTo(x, p); }
-  }
-  strokeFor();
+function grabFrame(o) {
+  const v = o.v;
+  if (!v || v.readyState < 2 || !v.videoWidth) return null;
+  const sw = 40, sh = Math.max(6, Math.round(sw / (o.aspect || 1.78)));
+  lo.width = sw; lo.height = sh;
+  try { lg.drawImage(v, 0, 0, sw, sh); } catch (err) { return null; }
+  return { sw, sh };
 }
 
 function drawViz(now) {
   requestAnimationFrame(drawViz);
-  if (document.hidden) return;
-  vframe++;
-  // pick up any audible video that isn't routed yet (audio engine may have woken late)
-  if (vframe % 30 === 0) for (const o of wins) if (!o.v.muted) routeVideo(o);
-  audioFeatures();
-  const energy = Math.min(1, lvl * 1.8 + beat * 0.35);
-  vt += 0.005 + lvl * 0.035 + beat * 0.01;
+  if (document.hidden || ++vframe % 2) return;            // ~30fps is plenty
+  const t = now / 1000;
+  const S = 8;                                             // reflections are built at 1/8 size, then scaled up = soft
+  const rwid = Math.ceil(VW / S), rhei = Math.ceil(VH / S);
+  if (rc.width !== rwid || rc.height !== rhei) { rc.width = rwid; rc.height = rhei; }
+  rg.clearRect(0, 0, rwid, rhei);
+  rg.imageSmoothingEnabled = true;
 
-  // trails on pure black
-  vg.globalCompositeOperation = 'source-over';
-  vg.fillStyle = 'rgba(0,0,0,0.26)';
-  vg.fillRect(0, 0, VW, VH);
-  vg.globalCompositeOperation = 'lighter';
+  const bh = VH * 0.22, floor = VH - bh;                   // bottom glass
+  const rw = VW * 0.12, wall = VW - rw;                     // right glass
+  const ordered = [...wins].sort((a, b) => (a.z || 0) - (b.z || 0));
 
-  // soft color fields that seep a little past the bands
-  const quiet = 0.045 + energy * 0.11;
-  const blobs = [
-    [VW * (0.2 + 0.15 * Math.sin(vt * 0.4)), VH * 0.95, VCOL[0]],
-    [VW * (0.55 + 0.12 * Math.sin(vt * 0.33 + 2)), VH * 0.97, VCOL[1]],
-    [VW * (0.82 + 0.05 * Math.sin(vt * 0.5 + 1)), VH * 0.93, VCOL[2]],
-    [VW * 0.97, VH * (0.45 + 0.2 * Math.sin(vt * 0.37 + 4)), VCOL[0]],
-    [VW * 0.99, VH * (0.15 + 0.1 * Math.sin(vt * 0.29 + 3)), VCOL[1]]
-  ];
-  for (const [x, y, c] of blobs) {
-    const r = Math.min(VW, VH) * (0.2 + energy * 0.09 + beat * 0.04);
-    const gr = vg.createRadialGradient(x, y, 0, x, y, r);
-    gr.addColorStop(0, rgba(c, quiet));
-    gr.addColorStop(1, rgba(c, 0));
-    vg.fillStyle = gr;
-    vg.fillRect(x - r, y - r, r * 2, r * 2);
-  }
+  for (const o of ordered) {
+    const f = grabFrame(o);
+    if (!f) continue;
+    const { sw, sh } = f;
 
-  // ribbons: wide faint glow pass + thin bright core
-  const n = 5;
-  for (const side of ['b', 'r']) {
-    for (let i = 0; i < n; i++) {
-      const c = VCOL[(i + (side === 'r' ? 1 : 0)) % VCOL.length];
-      const a = (0.14 + energy * 0.4) * (c === VCOL[4] ? 0.45 : 1);
-      ribbon(side, i, n, energy, () => {
-        vg.strokeStyle = rgba(c, a * 0.1); vg.lineWidth = 6 + energy * 7; vg.stroke();
-        vg.strokeStyle = rgba(c, Math.min(0.85, a)); vg.lineWidth = 1 + energy * 0.8; vg.stroke();
-      });
+    // floor: mirrored upside-down, squashed, a ripple per low-res row, fading with depth
+    const rh = Math.min(bh, o.h * 0.6) / S;
+    const rows = Math.max(4, Math.round(rh));
+    const near = 0.5 + 0.5 * Math.min(1, (o.top + o.h) / VH);
+    for (let k = 0; k < rows; k++) {
+      const d = k / rows;
+      const wob = (Math.sin(t * 1.5 + d * 11 + o.left * 0.013) * (0.3 + d * 1.6)
+                 + Math.sin(t * 2.3 - d * 23) * 0.35 * d);
+      rg.globalAlpha = 0.7 * near * Math.pow(1 - d, 1.6);
+      rg.drawImage(lo, 0, sh * (1 - (k + 1) / rows), sw, sh / rows,
+                   o.left / S + wob, floor / S + k * (rh / rows), o.w / S, rh / rows + 0.6);
+    }
+
+    // wall: mirrored sideways, squashed, rippling
+    const rr = Math.min(rw, o.w * 0.5) / S;
+    const cols = Math.max(4, Math.round(rr));
+    const nearR = 0.4 + 0.6 * Math.min(1, (o.left + o.w) / VW);
+    for (let k = 0; k < cols; k++) {
+      const d = k / cols;
+      const wob = Math.sin(t * 1.3 + d * 10 + o.top * 0.017) * (0.3 + d * 1.5)
+                + Math.sin(t * 2.1 - d * 21) * 0.3 * d;
+      rg.globalAlpha = 0.6 * nearR * Math.pow(1 - d, 1.6);
+      rg.drawImage(lo, sw * (1 - (k + 1) / cols), 0, sw / cols, sh,
+                   wall / S + k * (rr / cols), o.top / S + wob, rr / cols + 0.6, o.h / S);
     }
   }
+  rg.globalAlpha = 1;
 
-  // every so often a rainbow ribbon comes through, then fades
-  if (now > nextRainbow && rainbow < 0.02) { rainbow = 1; nextRainbow = now + 14000 + Math.random() * 16000; }
-  if (beat > 0.95 && rainbow < 0.02 && Math.random() < 0.03) rainbow = 0.8;
-  if (rainbow > 0.01) {
-    rainbow *= 0.992;
-    const env = Math.sin(Math.min(1, rainbow) * Math.PI);
-    for (const side of ['b', 'r']) {
-      const len = side === 'b' ? VW : VH;
-      const lg = side === 'b' ? vg.createLinearGradient(0, 0, VW, 0) : vg.createLinearGradient(0, VH, 0, 0);
-      for (let k = 0; k <= 12; k++) lg.addColorStop(k / 12, `hsla(${(k * 30 + vt * 40) % 360},100%,62%,${0.75 * env})`);
-      ribbon(side, 2.5, n, energy + 0.2, () => {
-        vg.strokeStyle = lg; vg.lineWidth = 1.6 + energy * 2; vg.stroke();
-      });
-    }
+  vg.clearRect(0, 0, VW, VH);
+  vg.imageSmoothingEnabled = true;
+  vg.imageSmoothingQuality = 'high';
+  vg.drawImage(rc, 0, 0, rwid * S, rhei * S);
+
+  // the glass itself: a fine bright edge, a faint sheen, and slow gliding glints
+  const edge = (x0, y0, x1, y1) => {
+    const g = vg.createLinearGradient(x0, y0, x1, y1);
+    g.addColorStop(0, 'rgba(255,255,255,0)');
+    g.addColorStop(0.5, 'rgba(255,255,255,.2)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    return g;
+  };
+  vg.fillStyle = edge(0, 0, VW, 0); vg.fillRect(0, floor, VW, 1);
+  vg.fillStyle = edge(0, 0, 0, VH); vg.fillRect(wall, 0, 1, VH);
+
+  let sheen = vg.createLinearGradient(0, floor, 0, VH);
+  sheen.addColorStop(0, 'rgba(255,255,255,.05)'); sheen.addColorStop(0.25, 'rgba(255,255,255,.012)'); sheen.addColorStop(1, 'rgba(255,255,255,0)');
+  vg.fillStyle = sheen; vg.fillRect(0, floor, VW, bh);
+  sheen = vg.createLinearGradient(wall, 0, VW, 0);
+  sheen.addColorStop(0, 'rgba(255,255,255,.045)'); sheen.addColorStop(0.3, 'rgba(255,255,255,.01)'); sheen.addColorStop(1, 'rgba(255,255,255,0)');
+  vg.fillStyle = sheen; vg.fillRect(wall, 0, rw, VH);
+
+  // glints: thin streaks that slide along each glass edge
+  const gx = ((t * 0.05) % 1.4 - 0.2) * VW, gy = ((t * 0.04 + 0.5) % 1.4 - 0.2) * VH;
+  for (const [x, y, sx, sy] of [[gx, floor, 5, 0.12], [wall, gy, 0.12, 5]]) {
+    vg.save(); vg.translate(x, y); vg.scale(sx, sy);
+    const g = vg.createRadialGradient(0, 0, 0, 0, 0, 40);
+    g.addColorStop(0, 'rgba(255,255,255,.35)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    vg.fillStyle = g; vg.fillRect(-40, -40, 80, 80);
+    vg.restore();
   }
-  vg.globalCompositeOperation = 'source-over';
 }
-if (vg) requestAnimationFrame(drawViz);
+if (vg && lg && rg) requestAnimationFrame(drawViz);
 
 /* ================= audio lock ================= */
 let lockWin = null, actx = null, analyser = null, audEl = null, audCv = null, audRaf = 0;
@@ -1234,7 +1219,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-13-005711';
+const BUILD = '2026-11-13-010254';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
