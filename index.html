@@ -212,6 +212,7 @@ function render() {
     list.append(d);
   }
   syncRows();
+  paintLines();
   // videos added from the keyboard mid-rename: keep the rename going on the rebuilt row
   if (editing && editing.it.row) {
     const it = editing.it;
@@ -256,6 +257,7 @@ function idb() {
   });
 }
 async function saveFiles(files) {
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (err) {}
   try {
     const db = await idb();
     await new Promise((res, rej) => {
@@ -668,7 +670,7 @@ function paintLines() {
 }
 new MutationObserver(() => {
   if (!paintQueued) { paintQueued = true; requestAnimationFrame(paintLines); }
-}).observe(list, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
+}).observe(list, { subtree: true, attributes: true, attributeFilter: ['class'] });
 
 /* ================= titles: tap-and-hold to rename ================= */
 const TITLE_KEY = 'phantas-titles';
@@ -909,7 +911,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-13-001205';
+const BUILD = '2026-11-13-001919';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
