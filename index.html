@@ -148,27 +148,27 @@
   .hub-mode::before { content: ""; width: 5px; height: 5px; border-right: 1px solid #ff6fb5; border-bottom: 1px solid #ff6fb5; transform: translateY(-2px) rotate(45deg); }
   .hub-mode.down { color: #ff6fb5; }
   /* controls live to the left of the wheel, away from the spinning hand */
-  .bar { position: absolute; right: calc(100% + 52px); bottom: 2%; display: flex; align-items: center; gap: 20px; white-space: nowrap; }
+  .bar { position: absolute; right: calc(100% + 22px); bottom: 7%; display: flex; align-items: center; gap: 20px; white-space: nowrap; }
   .ctl { font-size: 15px; font-weight: 200; letter-spacing: .04em; color: rgba(255,255,255,.75); cursor: pointer; padding: 8px 0; transition: opacity .1s, transform .1s; }
   .ctl.down { opacity: .45; transform: scale(.96); }
   .ctl.cancel { color: #ff3b4a; }
   .ctl.add { color: rgba(255,255,255,.45); }
   .ctl.enter { color: #2ee6d2; text-shadow: 0 0 12px rgba(46,230,210,.55); }
-  /* round icon buttons in the corners of the wheel's square, poking just past it */
+  /* bare icons tucked into the empty corners of the square the wheel sits in */
   .kbtn {
-    position: absolute; width: 46px; height: 46px; border-radius: 50%; cursor: pointer;
+    position: absolute; width: 44px; height: 44px; cursor: pointer;   /* 44px = comfortable tap area */
     display: flex; align-items: center; justify-content: center;
-    background: #000; color: rgba(255,255,255,.8);
-    box-shadow: inset 0 0 0 1px rgba(255,255,255,.24);
-    transition: color .15s, box-shadow .15s, background .15s, transform .1s;
+    color: rgba(255,255,255,.85);
+    transition: color .15s, transform .1s;
   }
-  .kbtn svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; }
-  .kbtn.down { transform: scale(.92); }
-  .kbtn.on { color: #ff6fb5; box-shadow: inset 0 0 0 1px #ff6fb5; background: rgba(255,111,181,.09); }
-  .kbtn.heart.on svg { fill: rgba(255,111,181,.35); }
-  .kbtn.k-del { top: -14px; right: -14px; }
-  .kbtn.heart { bottom: -14px; left: -14px; }
-  .kbtn.caps { bottom: -14px; right: -14px; }
+  .kbtn svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .kbtn.down { transform: scale(.88); }
+  .kbtn.on { color: #ff6fb5; }
+  .kbtn.heart.on svg { fill: rgba(255,111,181,.4); }
+  /* icon centres sit ~10.5% in from each edge: between the wheel and the box corner */
+  .kbtn.k-del { top: calc(10.5% - 22px); right: calc(10.5% - 22px); }
+  .kbtn.heart { bottom: calc(10.5% - 22px); left: calc(10.5% - 22px); }
+  .kbtn.caps { bottom: calc(10.5% - 22px); right: calc(10.5% - 22px); }
   #kb.open .bar, #kb.open .kbtn { animation: kin .4s ease backwards; animation-delay: .18s; }
   @keyframes kin { from { opacity: 0; } }
   .fly {
@@ -1334,7 +1334,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-13-051908';
+const BUILD = '2026-11-13-052300';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
