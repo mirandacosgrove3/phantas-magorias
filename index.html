@@ -439,7 +439,7 @@ function closeWin(o) {
     audible = null;
     if (top && IOS) giveSound(top);
   }
-  if (!anyAdjusted()) tile();
+  // closing never moves the other windows
 }
 
 function openWin(it, x, y) {
@@ -838,7 +838,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-12-235927';
+const BUILD = '2026-11-13-000114';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
