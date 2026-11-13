@@ -1285,8 +1285,8 @@ function buildKb() {
   // Corner piece (in the wheel's 0-200 units): square corner rounded, inner edge follows the wheel.
   // Drawn for the top-right, then rotated into the other corners.
   const cornerPath = (() => {
-    const Rc = 109, h = Math.sqrt(Rc * Rc - 100 * 100), rc = 12;   // Rc: keeps a clear gap from the wheel
-    const rt = 17;                                                     // rounding on the two thin ends
+    const Rc = 109, h = Math.sqrt(Rc * Rc - 100 * 100), rc = 22;   // Rc: keeps a clear gap from the wheel
+    const rt = 21;                                                     // rounding on the two thin ends
     const P = (r, ang) => `${(100 + r * Math.cos(ang)).toFixed(2)} ${(100 + r * Math.sin(ang)).toFixed(2)}`;
     const a1 = Math.atan2(-100, h), a2 = Math.atan2(-h, 100), d = rt / Rc;
     return `M ${100 + h + rt} 0 L ${200 - rc} 0 Q 200 0 200 ${rc} L 200 ${100 - h - rt} `
@@ -1540,7 +1540,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-13-053909';
+const BUILD = '2026-11-13-053933';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
