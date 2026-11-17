@@ -370,6 +370,7 @@
                                         background: #000; box-shadow: inset 0 0 0 1px #ff6fb5; }
   .uni-sl input::-moz-range-track { height: 1px; background: rgba(255,255,255,.35); }
   .uni-sl input::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: #000; border: 1px solid #ff6fb5; }
+  .uni-note { font-size: 12px; color: rgba(255,255,255,.4); padding: 10px 0 0; }
   .uni-reset { text-align: center; font-size: 13.5px; color: rgba(255,255,255,.45); padding: 26px 0 6px; cursor: pointer; }
   /* ---- prism on glass: a few soft, drifting colour clouds, like light through a prism on a wall ---- */
   .ed::before, .rdim::before {
@@ -603,6 +604,7 @@ picker.addEventListener('change', async () => {
   if (added) { items = itemsFromDb(); render(); }
   if (fresh.length) saveFiles(fresh);
   importsChanged();
+  scanAll();
 });
 
 /* Check whether a video next to this page is reachable */
@@ -643,7 +645,7 @@ function apply(o, animate) {
   o.el.style.transform = `translate3d(${o.left}px, ${o.top}px, 0)`;
 }
 
-addEventListener('resize', () => { for (const o of wins) apply(o, false); });
+addEventListener('resize', () => { for (const o of wins) apply(o, false); if (typeof arrangeAll === 'function') arrangeAll(false); });
 // belt and braces against the iOS loupe: nothing outside a text field may start a selection
 const inField = n => { const el = n && (n.nodeType === 1 ? n : n.parentElement); return !!(el && el.closest && el.closest('input, textarea')); };
 document.addEventListener('selectstart', e => { if (!inField(e.target)) e.preventDefault(); });
@@ -807,7 +809,8 @@ function closeWin(o) {
     audible = null;
     if (top && IOS) giveSound(top);
   }
-  // closing never moves the other windows
+  // closing never moves the other windows (unless arrange is on)
+  arrangeAll(true);
 }
 
 function openWin(it, x, y) {
@@ -851,6 +854,7 @@ function openWin(it, x, y) {
     applyCrop(o, false);
     computeTrim(o);
     applyMode(o);
+    arrangeAll(true);
     if (o.adjusted) { o.h = o.w / o.aspect; apply(o, false); }
     else relayout(o);
   });
@@ -1230,6 +1234,7 @@ function switchDb(id) {
   items = itemsFromDb();
   applyLook();
   render();
+  setTimeout(scanAll, 800);
 }
 function createDb(name) {
   const id = 'db' + Date.now().toString(36);
@@ -1713,7 +1718,7 @@ function buildKb() {
   saturn.addEventListener('pointerdown', e => { e.stopPropagation(); saturn.classList.add('down'); });
   saturn.addEventListener('pointerup', () => saturn.classList.remove('down'));
   saturn.addEventListener('click', e => { e.stopPropagation(); if (nativeIn) nativeIn.blur(); openUniversal(); });
-  bar.append(cancel, add, files, saturn, kbd, enter);
+  bar.append(cancel, kbd, enter);     // + videos, databases and the planet live in the title hold menu now
   pressable(cancel, () => finishEdit(false));
   pressable(enter, () => finishEdit(true));
   // the file picker needs a real click to open on iPad
@@ -1845,7 +1850,7 @@ function buildXkb() {
       pressable(ok, () => finishEdit(true));
       row.append(ok);
     }
-    if (ri === 3) row.append(addK, cancelK);                    // + videos and cancel close out the bottom row
+    if (ri === 3) row.append(cancelK);                          // cancel closes out the bottom row (+ videos lives in the title menu now)
     xkb.append(row);
   });
   // redo and backspace sit up top, beside the kaomoji strip
@@ -2082,7 +2087,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-17-112408';
+const BUILD = '2026-11-17-113444';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
@@ -2123,6 +2128,7 @@ addEventListener('pageshow', e => { if (e.persisted) checkForUpdate(); });
   items = itemsFromDb();
   applyLook();
   render();
+  setTimeout(scanAll, 2500);
 })();
 render();
 
@@ -2142,7 +2148,7 @@ const ICONS = {
 const WIN_MENU = { turn: 'rotate', items: [{ k: 'audio', a: -90 }, { k: 'crop', a: 150 }, { k: 'trim', a: 30 }],
                    subs: [{ k: 'play', parent: 'trim', a: -90 }] };
 // hold a title: a Y. rename up-left, universal (planet) up-right with videos + databases branching off it
-const TITLE_MENU = { turn: 'flip', stem: 78, items: [{ k: 'rename', a: -132 }, { k: 'planet', a: -48 }],
+const TITLE_MENU = { turn: 'flip', stem: 70, rest: 56, items: [{ k: 'rename', a: -140 }, { k: 'planet', a: -40 }],
                      subs: [{ k: 'camera', parent: 'planet', a: -68 }, { k: 'files', parent: 'planet', a: 18 }] };
 const SUB_D = 72;
 // resting: bubbles fused into one blob; the one you drag toward stretches out and splits off
@@ -2230,12 +2236,12 @@ function openRadial(menu, x, y, pid, opts) {
   const stems = [];
   if (menu.stem) {
     const a = tf(90, T);
-    for (const [f, r] of [[.42, 17], [.78, 14], [1, 12]])
+    for (const [f, r] of [[.42, 17], [.74, 15], [1, 13]])
       stems.push({ c: circ(), ang: a, f, rr: r, px: x, py: y, vx: 0, vy: 0, r: 2, vr: 0, tx: x, ty: y, tr: r, deco: true });
   }
   if (opts.onBubble) for (const b of [...bubs, ...subs]) opts.onBubble(b);
   document.body.append(lay);
-  rad = { menu, o: opts.o || null, run: opts.run, own: !!opts.ownPointer, x, y, ox, oy, pid, lay, bubs, subs, stems,
+  rad = { menu, rest: menu.rest || RAD_REST, o: opts.o || null, run: opts.run, own: !!opts.ownPointer, x, y, ox, oy, pid, lay, bubs, subs, stems,
           all: [...bubs, ...subs, ...stems], armed: null, core, coreR: 4,
           hov: null, dragging: true, fx: x, fy: y, closing: false, raf: 0, onClose: opts.onClose };
   radTargets();
@@ -2383,13 +2389,14 @@ function radTargets() {
       b.tx = x + cos * RAD_OUT; b.ty = y + sin * RAD_OUT; b.tr = RAD_BR;
     } else if (b === hov) {
       // follows the finger out along its direction, then snaps free
-      const along = Math.min(Math.max(fd, RAD_REST), RAD_OUT + 30);
-      const out = along < RAD_REST + 20 ? along : RAD_OUT + (along - RAD_OUT) * .35;
-      let tx = x + cos * Math.max(out, RAD_REST), ty = y + sin * Math.max(out, RAD_REST);
+      const R = rad.rest;
+      const along = Math.min(Math.max(fd, R), RAD_OUT + 30);
+      const out = along < R + 20 ? along : RAD_OUT + (along - RAD_OUT) * .35;
+      let tx = x + cos * Math.max(out, R), ty = y + sin * Math.max(out, R);
       tx += (fx - tx) * .18; ty += (fy - ty) * .18;
       b.tx = tx; b.ty = ty; b.tr = RAD_BR * 1.14;
     } else {
-      const r = hov ? RAD_REST - 3 : RAD_REST;
+      const r = hov ? rad.rest - 3 : rad.rest;
       b.tx = x + cos * r; b.ty = y + sin * r; b.tr = hov ? RAD_BR * .9 : RAD_BR;
     }
     b.c.setAttribute('fill', b === hov ? 'rgb(6,6,8)' : 'rgb(30,30,34)');
@@ -2467,6 +2474,7 @@ function saveItemMeta(it, key, val) {
     o.it[key] = val;
     refreshWin(o, key === 'crop');
   }
+  if (key === 'crop') arrangeAll(true);
 }
 
 // Show only the cropped part of the video inside its window, and size the window to it.
@@ -2606,6 +2614,8 @@ function analyzeEnds(src, dur) {
     const v = document.createElement('video');
     v.muted = true; v.preload = 'auto'; v.playsInline = true; v.setAttribute('playsinline', ''); v.src = src;
     await new Promise(res => { v.addEventListener('loadeddata', res, { once: true }); v.addEventListener('error', res, { once: true }); setTimeout(res, 5000); });
+    if (!dur || !isFinite(dur)) dur = v.duration;
+    if (!dur || !isFinite(dur)) { v.removeAttribute('src'); v.load(); return []; }
     const N = 24, cv = document.createElement('canvas'); cv.width = cv.height = N;
     const cx = cv.getContext('2d', { willReadFrequently: true });
     const grab = t => new Promise(res => {
@@ -2829,7 +2839,7 @@ function openPlayback(it) {
 
 
 /* ================= universal adjustments (per database, layered over each video's own edits) ================= */
-const UNI_DEF = { autoEnd: false, autoStart: false, maxLen: 0, ratio: 0, mode: 'off',
+const UNI_DEF = { autoEnd: false, autoStart: false, maxLen: 0, ratio: 0, arrange: 'off', mode: 'off',
                   look: 'none', bri: 100, con: 100, sat: 100, hue: 0, blend: 'normal', corners: 0 };
 const LOOKS = {
   none: '', mono: 'grayscale(1)', noir: 'grayscale(1) contrast(1.45) brightness(.9)',
@@ -2866,14 +2876,46 @@ function effCrop(o) {
   return o.it.crop;
 }
 function effMode(o) { const u = uni(); return u.mode !== 'off' ? (u.mode === 'normal' ? null : u.mode) : o.it.mode; }
+// end-card / black scans, saved per stored video so treated videos are ready the moment they open
+const AUTO_KEY = 'phantas-auto';
+let autoStore = {};
+try { autoStore = JSON.parse(localStorage.getItem(AUTO_KEY) || '{}') || {}; } catch (err) {}
+const saveAuto = () => { try { localStorage.setItem(AUTO_KEY, JSON.stringify(autoStore)); } catch (err) {} };
+const autoJobs = new Map();
+function scanItem(name, src) {
+  if (autoStore[name]) return Promise.resolve(autoStore[name]);
+  if (autoJobs.has(name)) return autoJobs.get(name);
+  const j = analyzeEnds(src, 0).then(list => { autoStore[name] = list; saveAuto(); autoJobs.delete(name); return list; },
+                                    () => { autoJobs.delete(name); return []; });
+  autoJobs.set(name, j);
+  return j;
+}
+// with an auto-cut toggle on, quietly scan every video in the list (one at a time) so none are left untreated
+let scanning = false;
+async function scanAll() {
+  const u = uni();
+  if (scanning || !(u.autoEnd || u.autoStart)) return;
+  scanning = true;
+  try {
+    for (const it of [...items]) {
+      if (autoStore[it.name]) continue;
+      const u2 = uni(); if (!(u2.autoEnd || u2.autoStart)) break;
+      await scanItem(it.name, it.src);
+      for (const o of wins) if (o.it.name === it.name && !o.closed) { computeTrim(o); applyMode(o); }
+      await new Promise(r => setTimeout(r, 120));
+    }
+  } finally { scanning = false; }
+}
 function computeTrim(o) {
   const u = uni(), dur = o.v.duration;
   if (!dur || !isFinite(dur)) { o.et = o.it.trim; return; }
   let s = o.it.trim ? o.it.trim.start : 0, e = o.it.trim ? o.it.trim.end : dur;
+  if (!o.auto && autoStore[o.it.name]) o.auto = autoStore[o.it.name];
   if ((u.autoEnd || u.autoStart) && !o.auto) {
     o.auto = 'busy';
-    analyzeEnds(o.it.src, dur).then(list => { if (!o.closed) { o.auto = list; computeTrim(o); applyMode(o); } });
+    scanItem(o.it.name, o.it.src).then(list => { if (!o.closed) { o.auto = list; computeTrim(o); applyMode(o); } });
   }
+
   if (Array.isArray(o.auto)) for (const sg of o.auto) {
     if (sg.side === 'end' && u.autoEnd) e = Math.min(e, sg.at);
     if (sg.side === 'start' && u.autoStart) s = Math.max(s, sg.at);
@@ -2883,6 +2925,41 @@ function computeTrim(o) {
   const prev = o.et;
   o.et = full ? null : { start: s, end: Math.max(e, s + .2) };
   if (o.et && (!prev || prev.start !== o.et.start)) try { o.v.currentTime = o.et.start; } catch (err) {}
+}
+// arrange: lay every open video out in tidy rows that fill the screen, each at its own shape (no cropping)
+function arrangeAll(animate) {
+  if (uni().arrange !== 'tidy') return;
+  const ws = wins.filter(o => !o.closed);
+  if (!ws.length) return;
+  const g = 10, pad = 14, W = innerWidth - pad * 2, H = innerHeight - pad * 2;
+  const as = ws.map(o => o.aspect || 16 / 9), n = as.length, total = as.reduce((a, b) => a + b, 0);
+  let best = null;
+  for (let k = 1; k <= n; k++) {
+    const rows = Array.from({ length: k }, () => []);
+    let c = 0;
+    as.forEach((a, i) => { rows[Math.min(k - 1, Math.floor((c + a / 2) / (total / k)))].push(i); c += a; });
+    if (rows.some(r => !r.length)) continue;
+    const hs = rows.map(r => (W - g * (r.length - 1)) / r.reduce((s, i) => s + as[i], 0));
+    const tot = hs.reduce((a, b) => a + b, 0) + g * (k - 1);
+    // never taller than ~70% of the screen per row
+    const sc = Math.min(1, H / tot, (H * .7) / Math.max(...hs));
+    const area = rows.reduce((s, r, ri) => s + r.reduce((t, i) => t + as[i], 0) * (hs[ri] * sc) ** 2, 0);
+    if (!best || area > best.area) best = { rows, hs, sc, area };
+  }
+  if (!best) return;
+  let y = pad + (H - (best.hs.reduce((a, b) => a + b * best.sc, 0) + g * (best.rows.length - 1))) / 2;
+  best.rows.forEach((r, ri) => {
+    const h = best.hs[ri] * best.sc;
+    const rw = r.reduce((s, i) => s + as[i] * h, 0) + g * (r.length - 1);
+    let x = pad + (W - rw) / 2;
+    for (const i of r) {
+      const o = ws[i];
+      o.h = h; o.w = h * as[i]; o.left = x; o.top = y; o.adjusted = true;
+      apply(o, animate);
+      x += o.w + g;
+    }
+    y += h + g;
+  });
 }
 function refreshWin(o, animate) {
   if (o.closed) return;
@@ -2896,7 +2973,7 @@ function openUniversal() {
   edOpen = true;
   const db = curDb(), before = db.uni ? { ...db.uni } : null;
   let u = uni();
-  const live = () => { db.uni = { ...u }; applyLook(u); for (const o of wins) refreshWin(o, true); preview(); };
+  const live = () => { db.uni = { ...u }; applyLook(u); for (const o of wins) refreshWin(o, true); arrangeAll(true); scanAll(); preview(); };
 
   const ed = document.createElement('div'); ed.className = 'ed uni';
   const head = document.createElement('div'); head.className = 'uni-head';
@@ -2963,10 +3040,15 @@ function openUniversal() {
     show(); w.append(inp, val); return w;
   };
 
+  const note = document.createElement('div'); note.className = 'uni-note';
+  note.textContent = 'everything here applies to every video in this list, including ones you add later';
+  list.append(note);
   section('length');
   row('cut end cards', toggle('autoEnd'), 'instagram outros & fades to black');
   row('cut black starts', toggle('autoStart'));
   row('max length', chips('maxLen', [['off', 0], ['3s', 3], ['5s', 5], ['10s', 10], ['15s', 15], ['30s', 30]]), 'loops the first part');
+  section('layout');
+  row('arrange', chips('arrange', [['off', 'off'], ['tidy', 'tidy']]), 'sizes & lines up open videos, no cropping');
   section('frame');
   row('same crop', chips('ratio', RATIOS), 'centre crop, replaces each crop');
   row('corners', chips('corners', [['square', 0], ['soft', 8], ['round', 18], ['pill', 60]]));
