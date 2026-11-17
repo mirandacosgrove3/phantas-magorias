@@ -25,6 +25,7 @@
     min-height: 100vh; box-sizing: border-box;
   }
   .t {
+    width: fit-content;                 /* only the text itself is tappable, not the whole line */
     font-size: clamp(10px, 1.75vw, 24px);
     line-height: 1.5;
     white-space: nowrap;
@@ -1713,8 +1714,14 @@ function buildDbPanel() {
   dbp.addEventListener('pointerdown', e => e.stopPropagation());
   document.body.append(dbp);
   // tap anywhere else to close it
+  // tap anywhere else to close it; that tap only closes the panel and never reaches what's underneath
   addEventListener('pointerdown', e => {
-    if (dbp.classList.contains('open') && !dbp.contains(e.target) && !e.target.closest('.files')) closeDbPanel();
+    if (!dbp.classList.contains('open') || dbp.contains(e.target) || e.target.closest('.files')) return;
+    e.stopPropagation(); e.preventDefault();
+    closeDbPanel();
+    const swallow = ev => { ev.stopPropagation(); ev.preventDefault(); };
+    addEventListener('click', swallow, { capture: true, once: true });
+    setTimeout(() => removeEventListener('click', swallow, { capture: true }), 600);
   }, true);
 }
 function closeDbPanel() { dbp.classList.remove('open'); const i = dbp.querySelector('input'); if (i) i.blur(); }
@@ -1831,7 +1838,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-17-092155';
+const BUILD = '2026-11-17-092605';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
