@@ -2146,7 +2146,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-17-115924';
+const BUILD = '2026-11-17-120439';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
@@ -2209,8 +2209,8 @@ const WIN_MENU = { turn: 'rotate', items: [{ k: 'audio', a: -90 }, { k: 'crop', 
                    subs: [{ k: 'play', parent: 'trim', a: -90 }] };
 // hold a title: a Y. rename up-left, universal (planet) up-right with videos + databases branching off it
 const TITLE_MENU = { turn: 'flip', rest: 60, core: 30, items: [{ k: 'rename', a: -128 }, { k: 'planet', a: -52 }],
-                     subs: [{ k: 'camera', parent: 'planet', a: -68 }, { k: 'files', parent: 'planet', a: 18 }, { k: 'gauge', parent: 'planet', a: 76 }] };
-const SUB_D = 72;
+                     subs: [{ k: 'camera', parent: 'planet', a: -68 }, { k: 'files', parent: 'planet', a: 18 }, { k: 'gauge', parent: 'planet', a: 80 }] };
+const SUB_D = 84;
 // resting: bubbles fused into one blob; the one you drag toward stretches out and splits off
 const RAD_REST = 54, RAD_OUT = 100, RAD_BR = 31;
 const NS = 'http://www.w3.org/2000/svg';
@@ -2282,13 +2282,14 @@ function openRadial(menu, x, y, pid, opts) {
     const par = bubs.find(b => b.k === s.parent);
     const sb = mkB(s, tf(s.a, T)); sb.r = 0; sb.tr = 0; sb.par = par;
     const P = { x: x + Math.cos(par.ang) * RAD_OUT, y: y + Math.sin(par.ang) * RAD_OUT };
-    const inside = a => { const hx = P.x + Math.cos(a) * SUB_D, hy = P.y + Math.sin(a) * SUB_D;
+    const inside = a => { const hx = P.x + Math.cos(a) * (s.d || SUB_D), hy = P.y + Math.sin(a) * (s.d || SUB_D);
       return hx > 40 && hx < innerWidth - 40 && hy > 40 && hy < innerHeight - 40; };
     for (const a of [sb.ang, -sb.ang, Math.PI - sb.ang, sb.ang + Math.PI]) if (inside(a)) { sb.ang = a; break; }
     // two branches mustn't land on the same spot after flipping
     const twin = (par.kids || []).find(k => Math.abs(Math.atan2(Math.sin(k.ang - sb.ang), Math.cos(k.ang - sb.ang))) < .6);
     if (twin) sb.ang = twin.ang + (sb.ang > twin.ang ? 1 : -1) * 1.3;
-    sb.anchor = P; sb.home = { x: P.x + Math.cos(sb.ang) * SUB_D, y: P.y + Math.sin(sb.ang) * SUB_D };
+    const D = s.d || SUB_D;
+    sb.anchor = P; sb.home = { x: P.x + Math.cos(sb.ang) * D, y: P.y + Math.sin(sb.ang) * D };
     par.kids = (par.kids || []).concat(sb);
     return sb;
   });
@@ -2678,7 +2679,7 @@ function openCrop(it) {
 
 /* ---- trim suggestions: find end cards (e.g. Instagram's logo outro) and black lead-ins/outs ---- */
 const sugCache = new Map();
-function analyzeEnds(src, dur) {
+function analyzeEnds(src, dur, stop) {
   if (sugCache.has(src)) return sugCache.get(src);
   const job = (async () => {
     const v = document.createElement('video');
@@ -2688,7 +2689,8 @@ function analyzeEnds(src, dur) {
     if (!dur || !isFinite(dur)) { v.removeAttribute('src'); v.load(); return []; }
     const N = 24, cv = document.createElement('canvas'); cv.width = cv.height = N;
     const cx = cv.getContext('2d', { willReadFrequently: true });
-    const grab = t => new Promise(res => {
+    const grab = t => new Promise((res, rej) => {
+      if (stop && stop()) { rej('stopped'); return; }
       let ok = false;
       const done = () => {
         if (ok) return; ok = true; v.removeEventListener('seeked', done);
@@ -2745,6 +2747,7 @@ function analyzeEnds(src, dur) {
     return out;
   })();
   sugCache.set(src, job);
+  job.catch(() => sugCache.delete(src));      // a stopped scan isn't remembered, so it can run again later
   return job;
 }
 
@@ -2955,7 +2958,8 @@ const autoJobs = new Map();
 function scanItem(name, src) {
   if (autoStore[name]) return Promise.resolve(autoStore[name]);
   if (autoJobs.has(name)) return autoJobs.get(name);
-  const j = analyzeEnds(src, 0).then(list => { autoStore[name] = list; saveAuto(); autoJobs.delete(name); return list; },
+  const busy = () => wins.some(o => !o.closed) || edOpen || document.hidden;
+  const j = analyzeEnds(src, 0, busy).then(list => { autoStore[name] = list; saveAuto(); autoJobs.delete(name); return list; },
                                     () => { autoJobs.delete(name); return []; });
   autoJobs.set(name, j);
   return j;
@@ -2967,17 +2971,19 @@ async function scanAll() {
   if (scanning || !(u.autoEnd || u.autoStart)) return;
   scanning = true;
   try {
-    for (const it of [...items]) {
-      if (autoStore[it.name]) continue;
-      while (document.hidden || wins.filter(o => !o.closed).length >= 3 || (fpsNow().fps && fpsNow().fps < 50))
-        await new Promise(r => setTimeout(r, 1500));
-      const u2 = uni(); if (!(u2.autoEnd || u2.autoStart)) break;
-      await scanItem(it.name, it.src);
-      for (const o of wins) if (o.it.name === it.name && !o.closed) { computeTrim(o); applyMode(o); }
-      await new Promise(r => setTimeout(r, 600));
-      // never compete with playback: wait while the app is hidden, busy, or not running smoothly
-      while (document.hidden || wins.filter(o => !o.closed).length >= 3 || (fpsNow().fps && fpsNow().fps < 50))
-        await new Promise(r => setTimeout(r, 1500));
+    // keep going round until every video in the list has a saved scan (a stopped scan is retried later)
+    for (let round = 0; round < 20; round++) {
+      let left = 0;
+      for (const it of [...items]) {
+        if (autoStore[it.name]) continue;
+        // only while nothing is playing: the scan never shares the decoder with a video you're watching
+        while (document.hidden || edOpen || wins.some(o => !o.closed)) await new Promise(r => setTimeout(r, 1200));
+        const u2 = uni(); if (!(u2.autoEnd || u2.autoStart)) return;
+        await scanItem(it.name, it.src);
+        if (!autoStore[it.name]) left++;
+        await new Promise(r => setTimeout(r, 300));
+      }
+      if (!left) break;
     }
   } finally { scanning = false; }
 }
@@ -2986,10 +2992,7 @@ function computeTrim(o) {
   if (!dur || !isFinite(dur)) { o.et = o.it.trim; return; }
   let s = o.it.trim ? o.it.trim.start : 0, e = o.it.trim ? o.it.trim.end : dur;
   if (!o.auto && autoStore[o.it.name]) o.auto = autoStore[o.it.name];
-  if ((u.autoEnd || u.autoStart) && !o.auto) {
-    o.auto = 'busy';
-    scanItem(o.it.name, o.it.src).then(list => { if (!o.closed) { o.auto = list; computeTrim(o); applyMode(o); } });
-  }
+  // not scanned yet: play it as is; the background pass scans it the next time nothing is playing
 
   if (Array.isArray(o.auto)) for (const sg of o.auto) {
     if (sg.side === 'end' && u.autoEnd) e = Math.min(e, sg.at - CUT_PAD);
@@ -3121,7 +3124,7 @@ function openUniversal() {
   note.textContent = 'everything here applies to every video in this list, including ones you add later';
   list.append(note);
   section('length');
-  row('cut end cards', toggle('autoEnd'), 'instagram outros & fades to black');
+  row('cut end cards', toggle('autoEnd'), 'instagram outros & fades to black · each video is checked once, only while nothing is playing');
   row('cut black starts', toggle('autoStart'));
   row('cut off start', chips('cutStart', [['off', 0], ['.5s', .5], ['1s', 1], ['2s', 2], ['3s', 3]]), 'shaves this off the start of every video');
   row('cut off end', chips('cutEnd', [['off', 0], ['.5s', .5], ['1s', 1], ['2s', 2], ['3s', 3], ['4s', 4], ['5s', 5]]), 'shaves this off the end of every video');
