@@ -273,6 +273,7 @@
   .rdim { position: fixed; inset: 0; z-index: 150000; pointer-events: none;
           background: rgba(0,0,0,0); -webkit-backdrop-filter: blur(0); backdrop-filter: blur(0);
           transition: background .35s ease, backdrop-filter .45s cubic-bezier(.2,.8,.2,1), -webkit-backdrop-filter .45s cubic-bezier(.2,.8,.2,1); }
+  .t.held .txt { color: #ff6fb5; }
   .rdim.on { background: rgba(0,0,0,.3); -webkit-backdrop-filter: blur(1px); backdrop-filter: blur(1px); }
   .rlay { position: fixed; inset: 0; z-index: 150002; touch-action: none; }
   .rlay svg.goo { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
@@ -402,6 +403,31 @@
              animation: haloSpin 16s linear infinite; }
   @keyframes haloSpin { to { transform: translate(-50%, -50%) rotate(360deg); } }
   .tl-chip { background: linear-gradient(112deg, rgba(255,80,140,.10), rgba(255,220,80,.07), rgba(80,220,255,.10)), rgba(255,255,255,.06); }
+  /* ---- video manager ---- */
+  .vm-head { padding: 34px max(28px, calc(50vw - 300px)) 8px; }
+  .vm-store { font-size: 13px; color: rgba(255,255,255,.55); padding-top: 8px; }
+  .vm-keep { font-size: 12px; color: rgba(255,255,255,.4); padding-top: 5px; }
+  .vm-keep u { color: #2ee6d2; text-decoration: none; cursor: pointer; }
+  .vm-keep i { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #ffb347; margin-right: 7px; vertical-align: 1px; }
+  .vm-keep i.okd { background: #2ee6d2; }
+  .vm-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: .5px solid rgba(255,255,255,.07); }
+  .vm-main { flex: 1; min-width: 0; }
+  .vm-nm { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .vm-sub { font-size: 11.5px; color: rgba(255,255,255,.4); padding-top: 4px; line-height: 1.5; }
+  .vm-sub em { font-style: normal; color: #ff6fb5; }
+  .vm-bar { position: relative; height: 1.5px; margin-top: 9px; background: rgba(255,255,255,.12); overflow: hidden; border-radius: 1px; }
+  .vm-bar i { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: #2ee6d2; transition: width .25s linear; }
+  .vm-bar.queued i { width: 18%; background: rgba(255,255,255,.35); animation: vmwait 1.2s ease-in-out infinite alternate; }
+  .vm-bar.failed i { width: 100%; background: #ff3b4a; }
+  @keyframes vmwait { from { transform: translateX(0); } to { transform: translateX(450%); } }
+  .vm-state { font-size: 11px; color: rgba(255,255,255,.5); padding-top: 5px; font-variant-numeric: tabular-nums; }
+  .vm-act { display: flex; gap: 4px; flex: none; }
+  .vm-act span { font-size: 12.5px; color: rgba(255,255,255,.5); padding: 8px 9px; cursor: pointer; white-space: nowrap; }
+  .vm-act .del.sure { color: #ff3b4a; }
+  .vm-empty { text-align: center; color: rgba(255,255,255,.35); padding: 40px 0; font-size: 14px; }
+  .ed-foot .add { color: rgba(255,255,255,.6); }
+  .uni-more { display: flex; justify-content: center; gap: 30px; padding: 14px 0 0; }
+  .uni-more span { font-size: 14px; color: rgba(255,255,255,.6); padding: 8px 10px; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -458,9 +484,11 @@ function render() {
       it.skipClick = false;
       if (editing) return;
       hx = e.clientX; hy = e.clientY;
-      hold = setTimeout(() => { hold = null; it.skipClick = true; startEdit(it); }, 480);
+      const pid = e.pointerId;
+      hold = setTimeout(() => { hold = null; it.skipClick = true; openTitleRadial(it, hx, hy, pid); }, 480);
     });
     d.addEventListener('pointermove', e => {
+      if (rad) return;
       if (hold && Math.hypot(e.clientX - hx, e.clientY - hy) > 10) { clearTimeout(hold); hold = null; }
     });
     ['pointerup', 'pointercancel'].forEach(t => d.addEventListener(t, () => { if (hold) { clearTimeout(hold); hold = null; } }));
@@ -521,12 +549,25 @@ async function saveFiles(files) {
   try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (err) {}
   try {
     const db = await idb();
-    await new Promise((res, rej) => {
-      const tx = db.transaction('videos', 'readwrite');
-      for (const f of files) tx.objectStore('videos').put({ name: f.name, blob: f, size: f.size, mod: f.lastModified, added: Date.now() });
-      tx.oncomplete = res; tx.onerror = () => rej(tx.error);
-    });
-  } catch (err) { console.warn('could not store videos', err); }
+    for (const f of files) imports.set(f.name, { size: f.size, state: 'queued' });
+    importsChanged();
+    // one at a time, so the video manager can show each one's progress
+    for (const f of files) {
+      const im = imports.get(f.name); if (!im) continue;
+      im.state = 'saving'; im.t0 = performance.now(); importsChanged();
+      try {
+        await new Promise((res, rej) => {
+          const tx = db.transaction('videos', 'readwrite');
+          tx.objectStore('videos').put({ name: f.name, blob: f, size: f.size, mod: f.lastModified, added: Date.now() });
+          tx.oncomplete = res; tx.onerror = () => rej(tx.error); tx.onabort = () => rej(tx.error);
+        });
+        im.state = 'stored'; im.t1 = performance.now();
+        const rate = f.size / Math.max(1, im.t1 - im.t0);
+        bytesPerMs = bytesPerMs ? bytesPerMs * .6 + rate * .4 : rate;
+      } catch (err) { im.state = 'failed'; }
+      importsChanged();
+    }
+  } catch (err) { console.warn('could not store videos', err); for (const f of files) { const im = imports.get(f.name); if (im && im.state !== 'stored') im.state = 'failed'; } importsChanged(); }
 }
 async function loadStored() {
   try {
@@ -557,6 +598,7 @@ picker.addEventListener('change', async () => {
   }
   if (added) { items = itemsFromDb(); render(); }
   if (fresh.length) saveFiles(fresh);
+  importsChanged();
 });
 
 /* Check whether a video next to this page is reachable */
@@ -856,7 +898,7 @@ function openWin(it, x, y) {
     clearTimeout(o.holdT);
     // hold still on a window = lock the sound to it
     if (pts.size === 1) o.holdT = setTimeout(() => {
-      if (start && !start.moved && pts.size === 1) { start.moved = true; const q = pts.get(e.pointerId) || start.p0; openRadial(o, q.x, q.y, e.pointerId); }
+      if (start && !start.moved && pts.size === 1) { start.moved = true; const q = pts.get(e.pointerId) || start.p0; openWinRadial(o, q.x, q.y, e.pointerId); }
     }, 520);
   });
   el.addEventListener('pointermove', e => {
@@ -2019,7 +2061,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-17-104557';
+const BUILD = '2026-11-17-110635';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
@@ -2065,18 +2107,24 @@ render();
 
 /* ================= hold menu: bubbles around the finger ================= */
 // Hold a window: three bubbles pop out. Drag onto one and let go, or let go in the middle and tap one.
-const RAD = [
-  { k: 'audio', a: -90,
-    svg: '<path d="M4 9.5h3l4.5-3.8v12.6L7 14.5H4z"/><path d="M15 9.4a3.6 3.6 0 0 1 0 5.2"/><path d="M17.4 7a7 7 0 0 1 0 10"/>' },
-  { k: 'crop', a: 150,
-    svg: '<path d="M7 3v14h14"/><path d="M3 7h14v14"/>' },
-  { k: 'trim', a: 30,
-    svg: '<circle cx="6.5" cy="6.5" r="2.6"/><circle cx="6.5" cy="17.5" r="2.6"/><path d="M8.6 8.1 20 17"/><path d="M8.6 15.9 20 7"/>' }
-];
-// second level: sprouts out of trim; hold, drag to trim, then up to it
-const RAD_SUB = { k: 'play', parent: 'trim', svg: '<path d="M8.5 6.2v11.6L18 12z"/>' };
-const SUB_D = 70;
-// resting: three bubbles fused into one blob; the one you drag toward stretches out and splits off
+const ICONS = {
+  audio:  '<path d="M4 9.5h3l4.5-3.8v12.6L7 14.5H4z"/><path d="M15 9.4a3.6 3.6 0 0 1 0 5.2"/><path d="M17.4 7a7 7 0 0 1 0 10"/>',
+  crop:   '<path d="M7 3v14h14"/><path d="M3 7h14v14"/>',
+  trim:   '<circle cx="6.5" cy="6.5" r="2.6"/><circle cx="6.5" cy="17.5" r="2.6"/><path d="M8.6 8.1 20 17"/><path d="M8.6 15.9 20 7"/>',
+  play:   '<path d="M8.5 6.2v11.6L18 12z"/>',
+  rename: '<path d="M2.5 18 7 5.5 11.5 18"/><path d="M4.2 13.6h5.6"/><path d="M19.8 11.2v6.8"/><circle cx="16.9" cy="15.1" r="2.9"/>',
+  planet: '<ellipse cx="12" cy="12" rx="10.3" ry="3.3" transform="rotate(-20 12 12)"/><circle cx="12" cy="12" r="5.4" fill="#1e1e22"/><path d="M1.7 12a10.3 3.3 0 0 0 20.6 0" transform="rotate(-20 12 12)"/>',
+  camera: '<path d="M3 8.2a1.8 1.8 0 0 1 1.8-1.8h2.3L8.6 4.5h6.8l1.5 1.9h2.3A1.8 1.8 0 0 1 21 8.2v9.3a1.8 1.8 0 0 1-1.8 1.8H4.8A1.8 1.8 0 0 1 3 17.5z"/><circle cx="12" cy="12.6" r="3.6"/>',
+  files:  '<path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/><path d="M3.5 10.5h17"/>'
+};
+// hold a video: sound / crop / trim (+ playback branching up out of trim)
+const WIN_MENU = { turn: 'rotate', items: [{ k: 'audio', a: -90 }, { k: 'crop', a: 150 }, { k: 'trim', a: 30 }],
+                   subs: [{ k: 'play', parent: 'trim', a: -90 }] };
+// hold a title: a Y. rename up-left, universal (planet) up-right with videos + databases branching off it
+const TITLE_MENU = { turn: 'flip', stem: true, items: [{ k: 'rename', a: -132 }, { k: 'planet', a: -48 }],
+                     subs: [{ k: 'camera', parent: 'planet', a: -68 }, { k: 'files', parent: 'planet', a: 18 }] };
+const SUB_D = 72;
+// resting: bubbles fused into one blob; the one you drag toward stretches out and splits off
 const RAD_REST = 54, RAD_OUT = 100, RAD_BR = 31;
 const NS = 'http://www.w3.org/2000/svg';
 let rad = null;
@@ -2094,62 +2142,89 @@ function gooDefs() {
   </filter></defs>`;
 }
 
-function openRadial(o, x, y, pid) {
+// menu: WIN_MENU / TITLE_MENU; run(k) does the chosen thing; dim/lift = what stays bright
+function openRadial(menu, x, y, pid, opts) {
   closeRadial(true);
   if (navigator.vibrate) try { navigator.vibrate(8); } catch (err) {}
-  // turn the whole shape if a bubble would leave the screen when pulled out
-  const fits = rot => RAD.every(b => {
-    const a = (b.a + rot) * Math.PI / 180, bx = x + Math.cos(a) * (RAD_OUT + 30), by = y + Math.sin(a) * (RAD_OUT + 30);
-    return bx > 0 && bx < innerWidth && by > 0 && by < innerHeight;
-  });
-  const rot = [0, 180, 90, -90, 45, -45, 135, -135].find(fits) || 0;
+  const deg = Math.PI / 180;
+  // turn (videos) or mirror (titles) the whole shape so nothing lands off screen
+  const turns = menu.turn === 'flip'
+    ? [[1, 1, 0], [1, -1, 0], [-1, 1, 0], [-1, -1, 0]]
+    : [0, 180, 90, -90, 45, -45, 135, -135].map(r => [1, 1, r]);
+  const tf = (aDeg, t) => { const a = (aDeg + t[2]) * deg; return Math.atan2(Math.sin(a) * t[1], Math.cos(a) * t[0]); };
+  const spots = t => {
+    const out = [];
+    for (const b of menu.items) { const a = tf(b.a, t); out.push([x + Math.cos(a) * (RAD_OUT + 30), y + Math.sin(a) * (RAD_OUT + 30)]); }
+    for (const s of menu.subs) {
+      const pa = tf(menu.items.find(b => b.k === s.parent).a, t), sa = tf(s.a, t);
+      out.push([x + Math.cos(pa) * RAD_OUT + Math.cos(sa) * (SUB_D + 30), y + Math.sin(pa) * RAD_OUT + Math.sin(sa) * (SUB_D + 30)]);
+    }
+    return out;
+  };
+  // pick the turn that needs the least sliding, then slide the hub so every bubble is on screen
+  const M = 36;
+  const shiftFor = t => {
+    const pts = spots(t);
+    const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+    const dx = Math.max(0, M - Math.min(...xs)) - Math.max(0, Math.max(...xs) - (innerWidth - M));
+    const dy = Math.max(0, M - Math.min(...ys)) - Math.max(0, Math.max(...ys) - (innerHeight - M));
+    return [dx, dy];
+  };
+  let T = turns[0], best = Infinity, sh = [0, 0];
+  // upright is the real shape: only flip/turn when sliding would be a long way
+  turns.forEach((t, i) => { const d = shiftFor(t), m = Math.hypot(d[0], d[1]) + (i ? 140 : 0); if (m < best - 1) { best = m; T = t; sh = d; } });
+  const ox = x, oy = y;     // where the finger went down; choices are read from here
+  x += sh[0]; y += sh[1];
 
-  const F = focusOn(o), dim = F.dim, halo = F.halo;
   const lay = document.createElement('div'); lay.className = 'rlay';
   const svg = document.createElementNS(NS, 'svg'); svg.setAttribute('class', 'goo');
   svg.innerHTML = gooDefs() + '<g filter="url(#rgoo)"></g>';
   const g = svg.querySelector('g');
-  const core = document.createElementNS(NS, 'circle');
-  core.setAttribute('cx', x); core.setAttribute('cy', y); core.setAttribute('fill', 'rgb(30,30,34)');
-  g.append(core);
+  const circ = () => { const c = document.createElementNS(NS, 'circle'); c.setAttribute('fill', 'rgb(30,30,34)'); g.append(c); return c; };
+  const core = circ(); core.setAttribute('cx', x); core.setAttribute('cy', y);
   lay.append(svg);
-  const bubs = RAD.map(b => {
-    const ang = (b.a + rot) * Math.PI / 180;
-    const c = document.createElementNS(NS, 'circle'); c.setAttribute('fill', 'rgb(30,30,34)'); g.append(c);
+  const icon = k => {
     const ic = document.createElement('div'); ic.className = 'ri';
-    ic.innerHTML = `<svg viewBox="0 0 24 24">${b.svg}</svg>`;
-    if (b.k === 'audio' && lockWin === o) ic.classList.add('on');
-    lay.append(ic);
-    return { ...b, ang, c, ic, px: x, py: y, vx: 0, vy: 0, r: 4, vr: 0, tx: x, ty: y, tr: RAD_BR };
+    ic.innerHTML = `<svg viewBox="0 0 24 24">${ICONS[k]}</svg>`;
+    lay.append(ic); return ic;
+  };
+  const mkB = (b, ang) => ({ ...b, ang, c: circ(), ic: icon(b.k), px: x, py: y, vx: 0, vy: 0, r: 4, vr: 0, tx: x, ty: y, tr: RAD_BR });
+  const bubs = menu.items.map(b => mkB(b, tf(b.a, T)));
+  const subs = menu.subs.map(s => {
+    const par = bubs.find(b => b.k === s.parent);
+    const sb = mkB(s, tf(s.a, T)); sb.r = 0; sb.tr = 0; sb.par = par;
+    const P = { x: x + Math.cos(par.ang) * RAD_OUT, y: y + Math.sin(par.ang) * RAD_OUT };
+    sb.anchor = P; sb.home = { x: P.x + Math.cos(sb.ang) * SUB_D, y: P.y + Math.sin(sb.ang) * SUB_D };
+    par.kids = (par.kids || []).concat(sb);
+    return sb;
   });
-  // the playback bubble hides inside trim until trim is pulled out
-  const par = bubs.find(b => b.k === RAD_SUB.parent);
-  const sc = document.createElementNS(NS, 'circle'); sc.setAttribute('fill', 'rgb(30,30,34)'); g.append(sc);
-  const sic = document.createElement('div'); sic.className = 'ri'; sic.innerHTML = `<svg viewBox="0 0 24 24">${RAD_SUB.svg}</svg>`;
-  lay.append(sic);
-  const P = { x: x + Math.cos(par.ang) * RAD_OUT, y: y + Math.sin(par.ang) * RAD_OUT };
-  const up = P.y - SUB_D > 50 ? -1 : 1;
-  const sub = { ...RAD_SUB, c: sc, ic: sic, px: x, py: y, vx: 0, vy: 0, r: 0, vr: 0, tx: x, ty: y, tr: 0,
-                anchor: P, home: { x: P.x, y: P.y + up * SUB_D }, up };
+  // the Y's stem: a short tail below the hub, part of the shape but not a choice
+  let stem = null;
+  if (menu.stem) {
+    const a = tf(90, T);
+    stem = { c: circ(), ic: { style: {} }, ang: a, px: x, py: y, vx: 0, vy: 0, r: 2, vr: 0,
+             tx: x + Math.cos(a) * 34, ty: y + Math.sin(a) * 34, tr: 17, deco: true };
+  }
+  if (opts.onBubble) for (const b of [...bubs, ...subs]) opts.onBubble(b);
   document.body.append(lay);
-  rad = { o, x, y, pid, dim, halo, lay, bubs, sub, par, all: [...bubs, sub], armed: false, core, coreR: 4, hov: null, dragging: true, fx: x, fy: y, closing: false, raf: 0 };
-
+  rad = { menu, o: opts.o || null, run: opts.run, own: !!opts.ownPointer, x, y, ox, oy, pid, lay, bubs, subs, stem,
+          all: [...bubs, ...subs, ...(stem ? [stem] : [])], armed: null, core, coreR: 4,
+          hov: null, dragging: true, fx: x, fy: y, closing: false, raf: 0, onClose: opts.onClose };
   radTargets();
   radLoop();
-
-  // after letting go in the middle: tap a bubble, or anywhere else to close
   lay.addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); });
-  lay.addEventListener('pointerup', e => {
-    e.stopPropagation();
-    if (!rad || rad.lay !== lay || rad.dragging) return;
-    const hit = rad.all.find(b => b.r > 8 && Math.hypot(e.clientX - b.px, e.clientY - b.py) < b.r + 8);
-    if (hit === rad.sub) { rad.hov = hit; radTargets(); radRun(hit); return; }
-    // first tap on trim pops it out with playback above it; second tap opens trim
-    if (hit === rad.par && !rad.armed) { rad.armed = true; rad.hov = hit; rad.fx = rad.par.px; rad.fy = rad.par.py; radTargets(); return; }
-    if (hit) { rad.hov = hit; rad.fx = rad.x + Math.cos(hit.ang) * RAD_OUT; rad.fy = rad.y + Math.sin(hit.ang) * RAD_OUT; radTargets(); radRun(hit); }
-    else closeRadial();
-  });
   lay.addEventListener('click', e => e.stopPropagation());
+  // a title isn't a captured window, so follow the finger at the page level
+  if (rad.own) {
+    const r = rad;
+    const mv = e => { if (rad === r && e.pointerId === pid) radMove(e.clientX, e.clientY); };
+    const up = e => {
+      if (e.pointerId !== pid) return;
+      removeEventListener('pointermove', mv, true); removeEventListener('pointerup', up, true); removeEventListener('pointercancel', up, true);
+      if (rad === r) radRelease(e.type === 'pointerup');
+    };
+    addEventListener('pointermove', mv, true); addEventListener('pointerup', up, true); addEventListener('pointercancel', up, true);
+  }
 }
 
 /* focus: the held video stays lit with a prism halo, everything else dims; tap elsewhere to leave */
@@ -2189,7 +2264,52 @@ function dropFocus(now) {
   if (now) kill(); else setTimeout(kill, 380);
 }
 
+// window hold
+function openWinRadial(o, x, y, pid) {
+  focusOn(o);
+  openRadial(WIN_MENU, x, y, pid, {
+    o,
+    onBubble: b => { if (b.k === 'audio' && lockWin === o) b.ic.classList.add('on'); },
+    run: k => {
+      if (o.closed) return;
+      if (k !== 'audio') dropFocus();
+      if (k === 'audio') { if (lockWin === o) unlock(); else setLock(o); }
+      else if (k === 'crop') openCrop(o.it);
+      else if (k === 'trim') openTrim(o.it);
+      else if (k === 'play') openPlayback(o.it);
+    }
+  });
+}
+
+// title hold: the titles stay bright above a soft dim while the Y is up
+function openTitleRadial(it, x, y, pid) {
+  const dim = document.createElement('div'); dim.className = 'rdim tdim';
+  document.body.append(dim);
+  list.style.zIndex = 150001;
+  void dim.offsetWidth; dim.classList.add('on');
+  it.row.classList.add('held');
+  const noScroll = e => e.preventDefault();
+  document.addEventListener('touchmove', noScroll, { passive: false });
+  openRadial(TITLE_MENU, x, y, pid, {
+    ownPointer: true,
+    onClose: () => {
+      document.removeEventListener('touchmove', noScroll);
+      it.row.classList.remove('held');
+      dim.classList.remove('on');
+      setTimeout(() => { dim.remove(); if (!rad || rad.menu !== TITLE_MENU) list.style.zIndex = ''; }, 380);
+    },
+    run: k => {
+      if (k === 'rename') startEdit(it);
+      else if (k === 'planet') openUniversal();
+      else if (k === 'camera') openVideos();
+      else if (k === 'files') toggleDbPanel();
+    }
+  });
+}
+
 function radPick(fx, fy) {
+  // nothing until the finger has actually moved; then direction is read from the hub
+  if (Math.hypot(fx - rad.ox, fy - rad.oy) < 26) return null;
   const dx = fx - rad.x, dy = fy - rad.y, d = Math.hypot(dx, dy);
   if (d < 26) return null;
   if (d > RAD_OUT + 120) return null;
@@ -2206,11 +2326,18 @@ function radMove(fx, fy) {
   if (!rad || rad.closing) return;
   rad.fx = fx; rad.fy = fy;
   let h = radPick(fx, fy);
-  if (rad.hov === rad.par || rad.hov === rad.sub) {
-    // from the pulled-out trim bubble, going up reaches playback
-    const A = rad.sub.anchor, along = (fy - A.y) * rad.sub.up, side = Math.abs(fx - A.x);
-    if (along > 26 && side < 70 + along * .4) h = rad.sub;
-    else if (Math.hypot(fx - A.x, fy - A.y) < 60) h = rad.par;
+  const cur = rad.hov, par = cur && (cur.kids ? cur : cur.par);
+  if (par && par.kids) {
+    // from a pulled-out bubble, heading toward one of its branches picks that branch
+    const A = par.kids[0].anchor, dx = fx - A.x, dy = fy - A.y, d = Math.hypot(dx, dy);
+    if (d > 26) {
+      const a = Math.atan2(dy, dx), back = Math.atan2(rad.y - A.y, rad.x - A.x);
+      const off = s => Math.abs(Math.atan2(Math.sin(a - s), Math.cos(a - s)));
+      let best = null, bd = .9;
+      for (const s of par.kids) if (off(s.ang) < bd) { bd = off(s.ang); best = s; }
+      if (best && off(back) > bd) h = best;
+      else if (d < 60) h = par;
+    } else h = par;
   }
   if (h !== rad.hov) { rad.hov = h; if (h && navigator.vibrate) try { navigator.vibrate(4); } catch (err) {} }
   radTargets();
@@ -2218,19 +2345,19 @@ function radMove(fx, fy) {
 
 // where each bubble wants to be; springs in radLoop get it there with a wobble
 function radTargets() {
-  const { bubs, hov, x, y, fx, fy } = rad;
+  const { bubs, subs, hov, x, y, fx, fy } = rad;
   const fd = Math.hypot(fx - x, fy - y);
+  const openPar = hov && (hov.kids ? hov : hov.par);
   for (const b of bubs) {
     const cos = Math.cos(b.ang), sin = Math.sin(b.ang);
     if (rad.closing) { b.tx = x; b.ty = y; b.tr = 0; continue; }
-    if (b === rad.par && (hov === rad.sub || (rad.armed && hov !== b))) {
-      b.tx = rad.sub.anchor.x; b.ty = rad.sub.anchor.y; b.tr = RAD_BR;
+    if (b === openPar && hov !== b) {
+      b.tx = x + cos * RAD_OUT; b.ty = y + sin * RAD_OUT; b.tr = RAD_BR;
     } else if (b === hov) {
       // follows the finger out along its direction, then snaps free
       const along = Math.min(Math.max(fd, RAD_REST), RAD_OUT + 30);
       const out = along < RAD_REST + 20 ? along : RAD_OUT + (along - RAD_OUT) * .35;
       let tx = x + cos * Math.max(out, RAD_REST), ty = y + sin * Math.max(out, RAD_REST);
-      // lean a little toward the finger
       tx += (fx - tx) * .18; ty += (fy - ty) * .18;
       b.tx = tx; b.ty = ty; b.tr = RAD_BR * 1.14;
     } else {
@@ -2239,12 +2366,18 @@ function radTargets() {
     }
     b.c.setAttribute('fill', b === hov ? 'rgb(6,6,8)' : 'rgb(30,30,34)');
   }
-  const sb = rad.sub, open = !rad.closing && (hov === rad.par || hov === sb || rad.armed);
-  if (!open) { sb.tx = rad.par.tx; sb.ty = rad.par.ty; sb.tr = 0; }
-  else if (hov === sb) {
-    sb.tx = sb.home.x + (fx - sb.home.x) * .2; sb.ty = sb.home.y + (fy - sb.home.y) * .2; sb.tr = RAD_BR * 1.14;
-  } else { sb.tx = sb.home.x; sb.ty = sb.home.y; sb.tr = RAD_BR * .9; }
-  sb.c.setAttribute('fill', hov === sb ? 'rgb(6,6,8)' : 'rgb(30,30,34)');
+  for (const s of subs) {
+    const open = !rad.closing && openPar === s.par;
+    if (!open) { s.tx = s.par.tx; s.ty = s.par.ty; s.tr = 0; }
+    else if (hov === s) { s.tx = s.home.x + (fx - s.home.x) * .2; s.ty = s.home.y + (fy - s.home.y) * .2; s.tr = RAD_BR * 1.14; }
+    else { s.tx = s.home.x; s.ty = s.home.y; s.tr = RAD_BR * .9; }
+    s.c.setAttribute('fill', hov === s ? 'rgb(6,6,8)' : 'rgb(30,30,34)');
+  }
+  if (rad.stem) {
+    const st = rad.stem;
+    if (rad.closing) { st.tx = x; st.ty = y; st.tr = 0; }
+    else { st.tx = x + Math.cos(st.ang) * 34; st.ty = y + Math.sin(st.ang) * 34; st.tr = hov ? 14 : 17; }
+  }
 }
 
 function radLoop() {
@@ -2261,6 +2394,7 @@ function radLoop() {
       b.px += b.vx; b.py += b.vy; b.r += b.vr;
       if (Math.abs(b.vx) + Math.abs(b.vy) + Math.abs(b.vr) > .05) moving = true;
       b.c.setAttribute('cx', b.px); b.c.setAttribute('cy', b.py); b.c.setAttribute('r', Math.max(0, b.r));
+      if (b.deco) continue;
       const s = Math.max(0, Math.min(1.3, b.r / RAD_BR));
       b.ic.style.transform = `translate(${b.px}px, ${b.py}px) scale(${s})`;
       b.ic.style.opacity = Math.min(1, s * 1.2);
@@ -2275,20 +2409,12 @@ function radRelease(isUp) {
   if (!rad) return;
   rad.dragging = false;
   if (isUp && rad.hov) { radRun(rad.hov); return; }
-  closeRadial();   // bubbles melt away; the video stays in focus until you tap elsewhere
+  closeRadial();   // bubbles melt away (a held video stays in focus until you tap elsewhere)
 }
 
 function radRun(b) {
-  const o = rad.o;
-  setTimeout(() => {
-    closeRadial();
-    if (o.closed) return;
-    if (b.k !== 'audio') dropFocus();
-    if (b.k === 'audio') { if (lockWin === o) unlock(); else setLock(o); }
-    else if (b.k === 'crop') openCrop(o.it);
-    else if (b.k === 'trim') openTrim(o.it);
-    else if (b.k === 'play') openPlayback(o.it);
-  }, 140);
+  const run = rad.run;
+  setTimeout(() => { closeRadial(); run(b.k); }, 140);
 }
 
 function closeRadial(now) {
@@ -2297,6 +2423,7 @@ function closeRadial(now) {
   r.closing = true;
   r.lay.style.pointerEvents = 'none';
   for (const b of r.all) { b.tx = r.x; b.ty = r.y; b.tr = 0; }
+  if (r.onClose) r.onClose();
   const kill = () => { cancelAnimationFrame(r.raf); r.lay.remove(); };
   if (now) kill(); else setTimeout(kill, 380);
 }
@@ -2830,6 +2957,15 @@ function openUniversal() {
     list.querySelectorAll('.uni-chips').forEach(c => c.sync()); sls.forEach(s => s.sync());
   });
   list.append(rs);
+  const more = document.createElement('div'); more.className = 'uni-more';
+  const mAdd = document.createElement('span'); mAdd.textContent = '+ videos';
+  const mVids = document.createElement('span'); mVids.textContent = 'manage videos';
+  const mDbs = document.createElement('span'); mDbs.textContent = 'databases';
+  mAdd.addEventListener('click', () => picker.click());
+  mVids.addEventListener('click', () => { ok.click(); setTimeout(openVideos, 260); });
+  mDbs.addEventListener('click', () => { ok.click(); setTimeout(toggleDbPanel, 260); });
+  more.append(mAdd, mVids, mDbs);
+  list.append(more);
 
   const close = () => {
     edOpen = false; ed.classList.remove('on');
@@ -2843,6 +2979,172 @@ function openUniversal() {
     const clean = {}; for (const k in u) if (u[k] !== UNI_DEF[k]) clean[k] = u[k];
     if (Object.keys(clean).length) db.uni = clean; else delete db.uni;
     saveDbs(); applyLook(); close();
+  });
+}
+
+
+/* ================= video manager (camera bubble): what's stored, what's importing ================= */
+// imports: name -> { size, state: 'queued' | 'saving' | 'stored' | 'failed', t0, t1 }
+const imports = new Map();
+let bytesPerMs = 0;          // measured from finished saves, used to animate the bar of the one in progress
+let vmRefresh = null;
+const fmtSize = n => !n ? '' : n > 1e9 ? (n / 1e9).toFixed(2) + ' GB' : n > 1e6 ? (n / 1e6).toFixed(1) + ' MB' : Math.round(n / 1e3) + ' KB';
+function importsChanged() { if (vmRefresh) vmRefresh(); }
+
+async function deleteStored(name) {
+  try {
+    const db = await idb();
+    await new Promise((res, rej) => { const tx = db.transaction('videos', 'readwrite'); tx.objectStore('videos').delete(name); tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
+  } catch (err) {}
+  const b = blobs.get(name); if (b) { try { URL.revokeObjectURL(b.src); } catch (err) {} blobs.delete(name); }
+  for (const d of dbState.dbs) d.items = d.items.filter(x => x.name !== name);
+  saveDbs();
+  for (const o of [...wins]) if (o.it.name === name) closeWin(o);
+  imports.delete(name);
+  items = itemsFromDb(); render();
+}
+
+function openVideos() {
+  closeRadial(true); dropFocus();
+  edOpen = true;
+  const ed = document.createElement('div'); ed.className = 'ed uni vm';
+  const head = document.createElement('div'); head.className = 'vm-head';
+  const list = document.createElement('div'); list.className = 'uni-list';
+  const foot = document.createElement('div'); foot.className = 'ed-foot';
+  const add = document.createElement('span'); add.className = 'add'; add.textContent = '+ videos';
+  const done = document.createElement('span'); done.className = 'ok'; done.textContent = 'done';
+  foot.append(add, done);
+  ed.append(head, list, foot);
+  document.body.append(ed);
+  void ed.offsetWidth; ed.classList.add('on');
+  ['pointerdown', 'click'].forEach(t => ed.addEventListener(t, e => e.stopPropagation()));
+  add.addEventListener('click', () => picker.click());     // a real tap, so the picker opens on iPad
+
+  const meta = new Map();     // name -> { dur, w, h }
+  const probe = [];           // read length/size of each video, one at a time
+  let probing = false;
+  const runProbe = () => {
+    if (probing || !probe.length || !ed.isConnected) return;
+    probing = true;
+    const name = probe.shift(), b = blobs.get(name), src = b ? b.src : localSrc.get(name);
+    if (!src) { probing = false; runProbe(); return; }
+    const v = document.createElement('video'); v.preload = 'metadata'; v.muted = true;
+    const fin = () => { probing = false; v.removeAttribute('src'); v.load(); draw(); runProbe(); };
+    v.addEventListener('loadedmetadata', () => { meta.set(name, { dur: v.duration, w: v.videoWidth, h: v.videoHeight }); fin(); }, { once: true });
+    v.addEventListener('error', fin, { once: true });
+    setTimeout(() => { if (probing && !meta.has(name)) fin(); }, 4000);
+    v.src = src;
+  };
+
+  let confirmDel = null, est = null, persisted = null;
+  const storage = async () => {
+    try { est = navigator.storage && navigator.storage.estimate ? await navigator.storage.estimate() : null; } catch (err) { est = null; }
+    try { persisted = navigator.storage && navigator.storage.persisted ? await navigator.storage.persisted() : null; } catch (err) {}
+    draw();
+  };
+
+  function draw() {
+    if (!ed.isConnected) return;
+    const db = curDb();
+    const names = [...new Set([...blobs.keys(), ...localSrc.keys(), ...imports.keys()])];
+    const total = [...blobs.values()].reduce((s, b) => s + (b.size || 0), 0);
+    head.innerHTML = '';
+    const ttl = document.createElement('div'); ttl.className = 'uni-ttl'; ttl.innerHTML = `<b>videos</b> · ${names.length}`;
+    const st = document.createElement('div'); st.className = 'vm-store';
+    let line = `${fmtSize(total) || '0 KB'} kept on this iPad`;
+    if (est && est.quota) line += ` · about ${fmtSize(Math.max(0, est.quota - (est.usage || 0)))} free for more`;
+    st.textContent = line;
+    const keep = document.createElement('div'); keep.className = 'vm-keep';
+    if (persisted === true) keep.innerHTML = '<i class="okd"></i>Safari won\'t clear these';
+    else if (persisted === false) {
+      keep.innerHTML = '<i></i>Safari may clear these if space runs low · <u>keep them</u>';
+      keep.querySelector('u').addEventListener('click', async () => { try { await navigator.storage.persist(); } catch (err) {} storage(); });
+    }
+    head.append(ttl, st, keep);
+
+    list.innerHTML = '';
+    // in progress first, then this list's videos, then the rest
+    const order = n => { const im = imports.get(n); if (im && im.state !== 'stored') return 0; return db.items.some(x => x.name === n) ? 1 : 2; };
+    names.sort((a, b) => order(a) - order(b));
+    let lastSec = -1;
+    for (const name of names) {
+      const sec = order(name);
+      if (sec !== lastSec) {
+        lastSec = sec;
+        const h = document.createElement('div'); h.className = 'uni-sec';
+        h.textContent = sec === 0 ? 'saving to this iPad' : sec === 1 ? `in ${db.name}` : 'stored, not in this list';
+        list.append(h);
+      }
+      const b = blobs.get(name), im = imports.get(name), m = meta.get(name);
+      const inDbs = dbState.dbs.filter(d => d.items.some(x => x.name === name));
+      const own = db.items.find(x => x.name === name);
+      const r = document.createElement('div'); r.className = 'vm-row';
+      const main = document.createElement('div'); main.className = 'vm-main';
+      const nm = document.createElement('div'); nm.className = 'vm-nm'; nm.textContent = (own && own.title) || name;
+      const sub = document.createElement('div'); sub.className = 'vm-sub';
+      const bits = [];
+      if (own && own.title && own.title !== name) bits.push(name);
+      if (b && b.size) bits.push(fmtSize(b.size)); else if (im) bits.push(fmtSize(im.size));
+      if (m && isFinite(m.dur)) bits.push(fmtT(m.dur).replace(/\.\d$/, ''));
+      if (m && m.w) bits.push(`${m.w}×${m.h}`);
+      if (inDbs.length) bits.push(inDbs.map(d => d.name).join(', '));
+      if (localSrc.has(name) && !b) bits.push('from the folder, not stored');
+      const edits = own ? ['crop', 'trim', 'mode'].filter(k => own[k]) : [];
+      if (edits.length) bits.push(edits.map(k => k === 'mode' ? own.mode : k).join(' + '));
+      if (wins.some(o => o.it.name === name)) bits.push('<em>open</em>');
+      sub.innerHTML = bits.map(x => String(x).startsWith('<em>') ? x : String(x).replace(/[<&]/g, '')).join(' · ');
+      main.append(nm, sub);
+      if (im && im.state !== 'stored') {
+        const bar = document.createElement('div'); bar.className = 'vm-bar ' + im.state;
+        const fill = document.createElement('i'); bar.append(fill);
+        const lab = document.createElement('div'); lab.className = 'vm-state';
+        let p = 0;
+        if (im.state === 'saving') {
+          const t = performance.now() - im.t0, guess = bytesPerMs ? im.size / bytesPerMs : 2500;
+          p = Math.min(.95, t / guess);
+          fill.style.width = p * 100 + '%';
+          lab.textContent = 'saving · ' + Math.round(p * 100) + '%';
+        } else if (im.state === 'queued') { lab.textContent = 'waiting'; }
+        else { lab.textContent = 'couldn\'t save. Still playable until you close Safari'; }
+        main.append(bar, lab);
+      }
+      const act = document.createElement('div'); act.className = 'vm-act';
+      if (b || localSrc.has(name)) {
+        const tog = document.createElement('span');
+        tog.textContent = own ? 'remove from list' : 'add to list';
+        tog.addEventListener('click', () => {
+          if (own) { db.items = db.items.filter(x => x.name !== name); saveDbs(); for (const o of [...wins]) if (o.it.name === name) closeWin(o); }
+          else addToDb(name);
+          items = itemsFromDb(); render(); draw();
+        });
+        act.append(tog);
+      }
+      if (b) {
+        const del = document.createElement('span'); del.className = 'del';
+        del.textContent = confirmDel === name ? 'delete for good?' : 'delete';
+        if (confirmDel === name) del.classList.add('sure');
+        del.addEventListener('click', async () => {
+          if (confirmDel !== name) { confirmDel = name; draw(); return; }
+          confirmDel = null; await deleteStored(name); storage();
+        });
+        act.append(del);
+      }
+      r.append(main, act);
+      list.append(r);
+      if (!m && !probe.includes(name) && (b || localSrc.has(name))) probe.push(name);
+    }
+    if (!names.length) { const e = document.createElement('div'); e.className = 'vm-empty'; e.textContent = 'no videos yet'; list.append(e); }
+    runProbe();
+  }
+
+  vmRefresh = () => { draw(); };
+  // keep the saving bars moving
+  const iv = setInterval(() => { if (!ed.isConnected) { clearInterval(iv); return; } if ([...imports.values()].some(i => i.state === 'saving')) draw(); }, 250);
+  storage();
+  draw();
+  done.addEventListener('click', () => {
+    edOpen = false; vmRefresh = null; ed.classList.remove('on');
+    setTimeout(() => ed.remove(), 240);
   });
 }
 
