@@ -270,38 +270,22 @@
   }
 
   /* ---- hold menu (bubbles) ---- */
-  .rdim { position: fixed; inset: 0; z-index: 150000; background: rgba(0,0,0,.5); opacity: 0; transition: opacity .22s ease; pointer-events: none; }
-  .rdim.on { opacity: 1; }
+  .rdim { position: fixed; inset: 0; z-index: 150000; pointer-events: none;
+          background: rgba(0,0,0,0); -webkit-backdrop-filter: blur(0) saturate(1); backdrop-filter: blur(0) saturate(1);
+          transition: background .35s ease, backdrop-filter .45s cubic-bezier(.2,.8,.2,1), -webkit-backdrop-filter .45s cubic-bezier(.2,.8,.2,1); }
+  .rdim.on { background: rgba(0,0,0,.38); -webkit-backdrop-filter: blur(16px) saturate(1.7) brightness(.85); backdrop-filter: blur(16px) saturate(1.7) brightness(.85); }
   .rlay { position: fixed; inset: 0; z-index: 150002; touch-action: none; }
-  .rring { position: absolute; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%;
-           box-shadow: 0 0 0 .5px rgba(255,255,255,.7); background: rgba(255,255,255,.06);
-           transform: scale(.4); opacity: 0; transition: transform .3s cubic-bezier(.3,1.55,.45,1), opacity .2s; }
-  .rlay.on .rring { transform: scale(1); opacity: 1; }
-  .rb { position: absolute; left: 0; top: 0; width: 58px; height: 58px; margin: -29px 0 0 -29px; border-radius: 50%;
-        background: rgba(28,28,30,.94); box-shadow: 0 0 0 .5px rgba(255,255,255,.28);
-        display: flex; align-items: center; justify-content: center; opacity: 0;
-        transition: transform .42s cubic-bezier(.3,1.55,.45,1), opacity .2s ease, background .16s ease, box-shadow .16s ease; }
-  .rb svg { width: 24px; height: 24px; fill: none; stroke: #fff; stroke-width: 1.2; stroke-linecap: round; stroke-linejoin: round; transition: stroke .16s; }
-  .rlay.on .rb { opacity: 1; }
-  .rlay.live .rb { transition: transform .2s cubic-bezier(.25,1.3,.5,1), opacity .2s, background .16s, box-shadow .16s; }
-  .rb.hov { background: #fff; box-shadow: 0 0 0 .5px #fff; }
-  .rb.hov svg { stroke: #000; }
-  .rb.on { box-shadow: 0 0 0 1px rgba(255,150,205,.9), 0 0 18px rgba(255,111,181,.35); }
-  .rb.on svg { stroke: #ff8fc6; }
-  .rb.hov.on svg { stroke: #000; }
-  .rlab { position: absolute; left: 0; top: 0; white-space: nowrap; color: #fff; font-weight: 200; font-size: 26px;
-          letter-spacing: .01em; pointer-events: none; opacity: 0; transform: translate(-50%, -100%) translateY(6px);
-          transition: opacity .15s ease, transform .2s ease; }
-  .rlab.on { opacity: 1; transform: translate(-50%, -100%); }
-  .rlay.out .rb, .rlay.out .rring { opacity: 0; transition: opacity .18s ease, transform .2s ease; }
+  .rlay svg.goo { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+  .ri { position: absolute; left: 0; top: 0; width: 24px; height: 24px; margin: -12px 0 0 -12px; pointer-events: none; }
+  .ri svg { width: 24px; height: 24px; fill: none; stroke: #fff; stroke-width: 1.2; stroke-linecap: round; stroke-linejoin: round; transition: stroke .15s; }
+  .ri.on svg { stroke: #ff8fc6; }
 
   /* ---- crop / trim editors ---- */
-  .ed { position: fixed; inset: 0; z-index: 200000; background: rgba(0,0,0,.94); color: #fff; font-weight: 300;
-        display: flex; flex-direction: column; align-items: center; opacity: 0; transition: opacity .22s ease; touch-action: none; }
+  .ed { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; height: 100lvh; z-index: 200000; color: #fff; font-weight: 300;
+        background: rgba(0,0,0,.66); -webkit-backdrop-filter: blur(26px) saturate(1.6); backdrop-filter: blur(26px) saturate(1.6);
+        display: flex; flex-direction: column; align-items: center; opacity: 0; transition: opacity .2s ease; touch-action: none; }
   .ed.on { opacity: 1; }
-  .ed-stage { flex: 1; width: 100%; display: flex; align-items: center; justify-content: center; min-height: 0;
-              transform: scale(.94); transition: transform .38s cubic-bezier(.3,1.4,.45,1); }
-  .ed.on .ed-stage { transform: scale(1); }
+  .ed-stage { flex: 1; width: 100%; display: flex; align-items: center; justify-content: center; min-height: 0; }
   .ed-box { position: relative; background: #000; }
   .ed-box.clip { overflow: hidden; }
   .ed-box video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; pointer-events: none; }
@@ -1942,7 +1926,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-17-094500';
+const BUILD = '2026-11-17-095601';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
@@ -1988,104 +1972,144 @@ render();
 /* ================= hold menu: bubbles around the finger ================= */
 // Hold a window: three bubbles pop out. Drag onto one and let go, or let go in the middle and tap one.
 const RAD = [
-  { k: 'audio', a: -90, lab: 'sound',
+  { k: 'audio', a: -90,
     svg: '<path d="M4 9.5h3l4.5-3.8v12.6L7 14.5H4z"/><path d="M15 9.4a3.6 3.6 0 0 1 0 5.2"/><path d="M17.4 7a7 7 0 0 1 0 10"/>' },
-  { k: 'crop', a: 150, lab: 'crop',
+  { k: 'crop', a: 150,
     svg: '<path d="M7 3v14h14"/><path d="M3 7h14v14"/>' },
-  { k: 'trim', a: 30, lab: 'trim',
+  { k: 'trim', a: 30,
     svg: '<path d="M8 6H5.5v12H8"/><path d="M16 6h2.5v12H16"/><path d="M10.5 12h3"/>' }
 ];
-const RAD_R = 92;
+// resting: three bubbles fused into one blob; the one you drag toward stretches out and splits off
+const RAD_REST = 31, RAD_OUT = 70, RAD_BR = 27;
+const NS = 'http://www.w3.org/2000/svg';
 let rad = null;
+
+// liquid joins: blur + threshold, then a translucent fill and a hairline rim
+function gooDefs() {
+  return `<defs><filter id="rgoo" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="7" result="b"/>
+    <feColorMatrix in="b" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 26 -12" result="g"/>
+    <feColorMatrix in="g" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 .8 0" result="fill"/>
+    <feMorphology in="g" operator="erode" radius="1" result="e"/>
+    <feComposite in="g" in2="e" operator="out" result="rim"/>
+    <feColorMatrix in="rim" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .45 0" result="rimw"/>
+    <feMerge><feMergeNode in="fill"/><feMergeNode in="rimw"/></feMerge>
+  </filter></defs>`;
+}
 
 function openRadial(o, x, y, pid) {
   closeRadial(true);
   if (navigator.vibrate) try { navigator.vibrate(8); } catch (err) {}
-  // turn the whole fan if it would leave the screen
+  // turn the whole shape if a bubble would leave the screen when pulled out
   const fits = rot => RAD.every(b => {
-    const a = (b.a + rot) * Math.PI / 180, bx = x + Math.cos(a) * RAD_R, by = y + Math.sin(a) * RAD_R;
-    return bx > 40 && bx < innerWidth - 40 && by > 70 && by < innerHeight - 40;
+    const a = (b.a + rot) * Math.PI / 180, bx = x + Math.cos(a) * (RAD_OUT + 30), by = y + Math.sin(a) * (RAD_OUT + 30);
+    return bx > 0 && bx < innerWidth && by > 0 && by < innerHeight;
   });
   const rot = [0, 180, 90, -90, 45, -45, 135, -135].find(fits) || 0;
 
   const dim = document.createElement('div'); dim.className = 'rdim';
   const lay = document.createElement('div'); lay.className = 'rlay';
-  const ring = document.createElement('div'); ring.className = 'rring';
-  ring.style.left = x + 'px'; ring.style.top = y + 'px';
-  const lab = document.createElement('div'); lab.className = 'rlab';
-  lay.append(ring);
-  const bubs = RAD.map((b, i) => {
-    const a = (b.a + rot) * Math.PI / 180;
-    const el = document.createElement('div'); el.className = 'rb';
-    el.innerHTML = `<svg viewBox="0 0 24 24">${b.svg}</svg>`;
-    el.style.transitionDelay = (i * 35) + 'ms';
-    el.style.transform = `translate(${x}px, ${y}px) scale(.3)`;
-    if (b.k === 'audio' && lockWin === o) el.classList.add('on');
-    lay.append(el);
-    return { ...b, el, ang: a, hx: x + Math.cos(a) * RAD_R, hy: y + Math.sin(a) * RAD_R };
+  const svg = document.createElementNS(NS, 'svg'); svg.setAttribute('class', 'goo');
+  svg.innerHTML = gooDefs() + '<g filter="url(#rgoo)"></g>';
+  const g = svg.querySelector('g');
+  const core = document.createElementNS(NS, 'circle');
+  core.setAttribute('cx', x); core.setAttribute('cy', y); core.setAttribute('fill', 'rgb(30,30,34)');
+  g.append(core);
+  lay.append(svg);
+  const bubs = RAD.map(b => {
+    const ang = (b.a + rot) * Math.PI / 180;
+    const c = document.createElementNS(NS, 'circle'); c.setAttribute('fill', 'rgb(30,30,34)'); g.append(c);
+    const ic = document.createElement('div'); ic.className = 'ri';
+    ic.innerHTML = `<svg viewBox="0 0 24 24">${b.svg}</svg>`;
+    if (b.k === 'audio' && lockWin === o) ic.classList.add('on');
+    lay.append(ic);
+    return { ...b, ang, c, ic, px: x, py: y, vx: 0, vy: 0, r: 4, vr: 0, tx: x, ty: y, tr: RAD_BR };
   });
-  lay.append(lab);
   document.body.append(dim, lay);
   o.el.style.zIndex = 150001;
-  rad = { o, x, y, pid, dim, lay, lab, bubs, hov: null, dragging: true, fx: x, fy: y };
-  void lay.offsetWidth;
-  dim.classList.add('on'); lay.classList.add('on');
-  radDraw();
-  setTimeout(() => { if (rad && rad.lay === lay) { lay.classList.add('live'); bubs.forEach(b => b.el.style.transitionDelay = ''); } }, 300);
+  rad = { o, x, y, pid, dim, lay, bubs, core, coreR: 4, hov: null, dragging: true, fx: x, fy: y, closing: false, raf: 0 };
+  void dim.offsetWidth; dim.classList.add('on');
+  radTargets();
+  radLoop();
 
   // after letting go in the middle: tap a bubble, or anywhere else to close
-  lay.addEventListener('pointerdown', e => {
-    e.stopPropagation(); e.preventDefault();
-    if (!rad || rad.dragging) return;
-    const b = e.target.closest('.rb');
-    const hit = b && rad.bubs.find(q => q.el === b);
-    if (hit) { rad.hov = hit; radDraw(); radRun(hit); } else closeRadial();
+  lay.addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); });
+  lay.addEventListener('pointerup', e => {
+    e.stopPropagation();
+    if (!rad || rad.lay !== lay || rad.dragging) return;
+    const hit = rad.bubs.find(b => Math.hypot(e.clientX - b.px, e.clientY - b.py) < RAD_BR + 8);
+    if (hit) { rad.hov = hit; rad.fx = rad.x + Math.cos(hit.ang) * RAD_OUT; rad.fy = rad.y + Math.sin(hit.ang) * RAD_OUT; radTargets(); radRun(hit); }
+    else closeRadial();
   });
   lay.addEventListener('click', e => e.stopPropagation());
 }
 
 function radPick(fx, fy) {
   const dx = fx - rad.x, dy = fy - rad.y, d = Math.hypot(dx, dy);
-  if (d < 30) return null;
+  if (d < 22) return null;
+  if (d > RAD_OUT + 110) return null;
   const a = Math.atan2(dy, dx);
   let best = null, bd = 1.0;
   for (const b of rad.bubs) {
     const diff = Math.abs(Math.atan2(Math.sin(a - b.ang), Math.cos(a - b.ang)));
     if (diff < bd) { bd = diff; best = b; }
   }
-  // too far past the bubble = not choosing it
-  if (best && d > RAD_R + 90) return null;
   return best;
 }
 
 function radMove(fx, fy) {
-  if (!rad) return;
+  if (!rad || rad.closing) return;
   rad.fx = fx; rad.fy = fy;
   const h = radPick(fx, fy);
   if (h !== rad.hov) { rad.hov = h; if (h && navigator.vibrate) try { navigator.vibrate(4); } catch (err) {} }
-  radDraw();
+  radTargets();
 }
 
-function radDraw() {
-  if (!rad) return;
-  const { bubs, hov, fx, fy, lab } = rad;
+// where each bubble wants to be; springs in radLoop get it there with a wobble
+function radTargets() {
+  const { bubs, hov, x, y, fx, fy } = rad;
+  const fd = Math.hypot(fx - x, fy - y);
   for (const b of bubs) {
-    // bubbles lean toward the finger like they're on a soft string
-    let ox = 0, oy = 0;
-    const dx = fx - b.hx, dy = fy - b.hy, d = Math.hypot(dx, dy);
-    const reach = b === hov ? 220 : 150, pull = b === hov ? 22 : 9;
-    if (rad.dragging && d > 0.5 && d < reach) { const k = pull * (1 - d / reach) * Math.min(1, d / 30); ox = dx / d * k; oy = dy / d * k; }
-    const s = b === hov ? 1.24 : (hov ? 0.92 : 1);
-    b.el.style.transform = `translate(${b.hx + ox}px, ${b.hy + oy}px) scale(${s})`;
-    b.el.classList.toggle('hov', b === hov);
+    const cos = Math.cos(b.ang), sin = Math.sin(b.ang);
+    if (rad.closing) { b.tx = x; b.ty = y; b.tr = 0; continue; }
+    if (b === hov) {
+      // follows the finger out along its direction, then snaps free
+      const along = Math.min(Math.max(fd, RAD_REST), RAD_OUT + 26);
+      const out = along < RAD_REST + 16 ? along : RAD_OUT + (along - RAD_OUT) * .35;
+      let tx = x + cos * Math.max(out, RAD_REST), ty = y + sin * Math.max(out, RAD_REST);
+      // lean a little toward the finger
+      tx += (fx - tx) * .18; ty += (fy - ty) * .18;
+      b.tx = tx; b.ty = ty; b.tr = RAD_BR * 1.14;
+    } else {
+      const r = hov ? RAD_REST - 3 : RAD_REST;
+      b.tx = x + cos * r; b.ty = y + sin * r; b.tr = hov ? RAD_BR * .9 : RAD_BR;
+    }
+    b.c.setAttribute('fill', b === hov ? 'rgb(6,6,8)' : 'rgb(30,30,34)');
   }
-  if (hov) {
-    lab.textContent = hov.k === 'audio' && lockWin === rad.o ? 'sound off' : hov.lab;
-    const top = Math.min(...bubs.map(b => b.hy));
-    lab.style.left = Math.min(Math.max(hov.hx, 90), innerWidth - 90) + 'px';
-    lab.style.top = (Math.min(top, hov.hy) - 44) + 'px';
-    lab.classList.add('on');
-  } else lab.classList.remove('on');
+}
+
+function radLoop() {
+  const r = rad;
+  const step = () => {
+    let moving = r.closing;
+    const ck = r.closing ? 0 : (r.hov ? 16 : 20);
+    r.coreR += (ck - r.coreR) * .25;
+    r.core.setAttribute('r', Math.max(0, r.coreR));
+    for (const b of r.bubs) {
+      b.vx = (b.vx + (b.tx - b.px) * .2) * .7;
+      b.vy = (b.vy + (b.ty - b.py) * .2) * .7;
+      b.vr = (b.vr + (b.tr - b.r) * .22) * .66;
+      b.px += b.vx; b.py += b.vy; b.r += b.vr;
+      if (Math.abs(b.vx) + Math.abs(b.vy) + Math.abs(b.vr) > .05) moving = true;
+      b.c.setAttribute('cx', b.px); b.c.setAttribute('cy', b.py); b.c.setAttribute('r', Math.max(0, b.r));
+      const s = Math.max(0, b.r / RAD_BR);
+      b.ic.style.transform = `translate(${b.px}px, ${b.py}px) scale(${s})`;
+      b.ic.style.opacity = Math.min(1, s * 1.2);
+    }
+    if (rad === r || r.closing) r.raf = requestAnimationFrame(step);
+    if (r.closing && !moving) cancelAnimationFrame(r.raf);
+  };
+  r.raf = requestAnimationFrame(step);
 }
 
 function radRelease(isUp) {
@@ -2094,31 +2118,31 @@ function radRelease(isUp) {
   if (isUp && rad.hov) { radRun(rad.hov); return; }
   const d = Math.hypot(rad.fx - rad.x, rad.fy - rad.y);
   if (!isUp || d > 40) { closeRadial(); return; }
-  // let go in the middle: menu stays for tapping
-  rad.hov = null; radDraw();
+  // let go in the middle: the blob stays for tapping
+  rad.hov = null; rad.fx = rad.x; rad.fy = rad.y; radTargets();
 }
 
 function radRun(b) {
   const o = rad.o;
-  b.el.style.transform += ' scale(1.08)';
   setTimeout(() => {
     closeRadial();
     if (o.closed) return;
     if (b.k === 'audio') { if (lockWin === o) unlock(); else setLock(o); }
     else if (b.k === 'crop') openCrop(o.it);
     else if (b.k === 'trim') openTrim(o.it);
-  }, 120);
+  }, 140);
 }
 
 function closeRadial(now) {
   if (!rad) return;
   const r = rad; rad = null;
+  r.closing = true;
   if (!r.o.closed) r.o.el.style.zIndex = r.o.z;
-  r.lay.classList.add('out'); r.dim.classList.remove('on'); r.lab.classList.remove('on');
-  r.bubs.forEach(b => b.el.style.transform = `translate(${r.x}px, ${r.y}px) scale(.4)`);
-  r.lay.style.pointerEvents = 'auto';
-  const kill = () => { r.lay.remove(); r.dim.remove(); };
-  if (now) kill(); else setTimeout(kill, 260);
+  r.dim.classList.remove('on');
+  r.lay.style.pointerEvents = 'none';
+  for (const b of r.bubs) { b.tx = r.x; b.ty = r.y; b.tr = 0; }
+  const kill = () => { cancelAnimationFrame(r.raf); r.lay.remove(); r.dim.remove(); };
+  if (now) kill(); else setTimeout(kill, 380);
 }
 
 /* ================= crop + trim (saved per database item) ================= */
@@ -2213,7 +2237,7 @@ function openCrop(it) {
   let bw = 0, bh = 0, va = 16 / 9;
   const fit = () => {
     if (S.v.videoWidth) va = S.v.videoWidth / S.v.videoHeight;
-    const mw = innerWidth - 80, mh = S.stage.clientHeight - 60;
+    const mw = innerWidth * .72, mh = S.stage.clientHeight * .78;
     bw = Math.min(mw, mh * va); bh = bw / va;
     box.style.width = bw + 'px'; box.style.height = bh + 'px';
     draw();
@@ -2285,7 +2309,7 @@ function openTrim(it) {
 
   const fit = () => {
     const va = S.v.videoWidth ? S.v.videoWidth / S.v.videoHeight : 16 / 9;
-    const mw = innerWidth - 80, mh = S.stage.clientHeight - 40;
+    const mw = innerWidth * .72, mh = S.stage.clientHeight * .8;
     const bw = Math.min(mw, mh * va);
     box.style.width = bw + 'px'; box.style.height = bw / va + 'px';
   };
