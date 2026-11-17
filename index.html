@@ -203,7 +203,9 @@
   .dbrow .n { font-size: 12px; color: rgba(255,255,255,.38); }
   .dbrow.cur { color: #ff6fb5; }
   .dbrow.down { background: rgba(255,255,255,.07); }
-  .dbrow.new { color: rgba(255,255,255,.5); }
+  .dbrow.new { color: rgba(255,255,255,.5); font-size: 22px; padding-top: 6px; padding-bottom: 6px; }
+  .dbrow.held { box-shadow: inset 0 0 0 1px #ff6fb5; }
+  .dbrow .dbname { font-size: 17px; padding: 0 2px; }
   .dbnew { display: flex; align-items: center; gap: 14px; padding: 4px 8px 8px 14px; }
   .dbname { flex: 1; min-width: 0; background: transparent; border: 0; border-bottom: 1px solid rgba(255,255,255,.25); border-radius: 0; color: #fff; caret-color: #ff6fb5; font: inherit; font-size: 17px; font-weight: 200; padding: 8px 2px; outline: none; }
   .dbname::placeholder { color: rgba(255,255,255,.3); }
@@ -1733,22 +1735,55 @@ function toggleDbPanel() {
 }
 function showDbList() {
   dbp.innerHTML = '';
-  dbp.append(mk('hd', 'databases'));
   for (const d of dbState.dbs) {
     const row = mk('dbrow' + (d.id === dbState.current ? ' cur' : ''), '');
     row.append(mk('nm', d.name), mk('n', String(d.items.length)));
-    pressable(row, () => { closeDbPanel(); if (d.id !== dbState.current) switchDb(d.id); });
+    // tap = switch to it, hold = rename it
+    let hold = null, held = false, sx = 0, sy = 0, live = false;
+    row.addEventListener('pointerdown', e => {
+      e.stopPropagation(); e.preventDefault();
+      live = true; held = false; sx = e.clientX; sy = e.clientY; row.classList.add('down');
+      hold = setTimeout(() => { held = true; row.classList.add('held'); }, 480);
+    });
+    row.addEventListener('pointermove', e => {
+      if (live && Math.hypot(e.clientX - sx, e.clientY - sy) > 10) { live = false; clearTimeout(hold); row.classList.remove('down', 'held'); }
+    });
+    row.addEventListener('pointerup', e => {
+      e.stopPropagation(); clearTimeout(hold); row.classList.remove('down');
+      if (!live) return;
+      live = false;
+      if (held) renameDbRow(row, d);                          // focus happens inside the lift, so the keyboard comes up
+      else { closeDbPanel(); if (d.id !== dbState.current) switchDb(d.id); }
+    });
+    row.addEventListener('pointercancel', () => { live = false; clearTimeout(hold); row.classList.remove('down', 'held'); });
     dbp.append(row);
   }
-  const nw = mk('dbrow new', '+ new database');
+  const nw = mk('dbrow new', '+');
   nw.addEventListener('pointerdown', e => { e.stopPropagation(); nw.classList.add('down'); });
   nw.addEventListener('pointerup', () => nw.classList.remove('down'));
   nw.addEventListener('click', e => { e.stopPropagation(); showNewDb(); dbp.querySelector('input').focus(); });
   dbp.append(nw);
 }
+function renameDbRow(row, d) {
+  row.classList.remove('held');
+  const input = document.createElement('input');
+  input.className = 'dbname'; input.value = d.name;
+  input.setAttribute('autocapitalize', 'off'); input.setAttribute('autocorrect', 'off'); input.spellcheck = false;
+  const n = row.querySelector('.nm'); n.replaceWith(input);
+  let done = false;
+  const save = () => {
+    if (done) return; done = true;
+    const v = input.value.trim(); if (v) { d.name = v; saveDbs(); }
+    showDbList();
+  };
+  input.addEventListener('pointerdown', e => e.stopPropagation());
+  input.addEventListener('pointerup', e => e.stopPropagation());
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); save(); } else if (e.key === 'Escape') { done = true; showDbList(); } });
+  input.addEventListener('blur', save);
+  input.focus(); input.select();
+}
 function showNewDb() {
   dbp.innerHTML = '';
-  dbp.append(mk('hd', dbState.dbs.length <= 1 ? 'create a new database' : 'new database'));
   const wrap = document.createElement('div'); wrap.className = 'dbnew';
   const input = document.createElement('input');
   input.className = 'dbname'; input.placeholder = 'name';
@@ -1838,7 +1873,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-17-092605';
+const BUILD = '2026-11-17-092731';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
