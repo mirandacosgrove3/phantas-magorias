@@ -306,7 +306,7 @@
   .ed-foot { display: flex; gap: 64px; padding: 10px 0 calc(22px + env(safe-area-inset-bottom)); font-size: 15px; }
   .ed-foot span { padding: 10px 14px; cursor: pointer; }
   .ed-foot .no { color: #ff3b4a; } .ed-foot .ok { color: #2ee6d2; }
-  .tl-wrap { width: min(720px, calc(100vw - 80px)); padding-top: 18px; }
+  .tl-wrap { width: min(720px, calc(100vw - 80px)); padding-top: 52px; }
   .tl { position: relative; height: 46px; touch-action: none; }
   .tl-track { position: absolute; inset: 0; box-shadow: inset 0 0 0 .5px rgba(255,255,255,.35); }
   .tl-sel { position: absolute; top: 0; bottom: 0; border-top: 1px solid #ff6fb5; border-bottom: 1px solid #ff6fb5; background: rgba(255,111,181,.07); }
@@ -316,6 +316,18 @@
   .tl-ph { position: absolute; top: -4px; bottom: -4px; width: 1px; background: #fff; pointer-events: none; }
   .tl-t { display: flex; justify-content: space-between; font-size: 13px; color: rgba(255,255,255,.6); padding-top: 12px; font-variant-numeric: tabular-nums; }
   .tl-t b { font-weight: 300; color: #fff; }
+  .tl-sug { position: absolute; top: 0; bottom: 0; pointer-events: none;
+            background: repeating-linear-gradient(135deg, rgba(255,59,74,.32) 0 1px, transparent 1px 7px);
+            box-shadow: inset 0 0 0 .5px rgba(255,59,74,.55); transition: opacity .25s; }
+  .tl-chip { position: absolute; bottom: calc(100% + 10px); transform: translateX(-50%); white-space: nowrap;
+             font-size: 12.5px; letter-spacing: .02em; color: #fff; padding: 6px 11px; border-radius: 999px; cursor: pointer;
+             background: rgba(255,255,255,.08); box-shadow: inset 0 0 0 .5px rgba(255,255,255,.4);
+             -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+             animation: chipin .4s cubic-bezier(.3,1.5,.45,1) backwards; transition: opacity .2s, transform .2s; }
+  .tl-chip i { font-style: normal; color: #ff3b4a; margin-right: 6px; }
+  .tl-chip.gone, .tl-sug.gone { opacity: 0; pointer-events: none; }
+  .tl-scan { position: absolute; bottom: calc(100% + 14px); right: 0; font-size: 12px; color: rgba(255,255,255,.35); }
+  @keyframes chipin { from { opacity: 0; transform: translateX(-50%) translateY(6px) scale(.85); } }
 </style>
 </head>
 <body>
@@ -1926,7 +1938,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-17-095945';
+const BUILD = '2026-11-17-100358';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
@@ -2286,6 +2298,69 @@ function openCrop(it) {
   addEventListener('resize', fit);
 }
 
+
+/* ---- trim suggestions: find end cards (e.g. Instagram's logo outro) and black lead-ins/outs ---- */
+const sugCache = new Map();
+function analyzeEnds(src, dur) {
+  if (sugCache.has(src)) return sugCache.get(src);
+  const job = (async () => {
+    const v = document.createElement('video');
+    v.muted = true; v.preload = 'auto'; v.playsInline = true; v.setAttribute('playsinline', ''); v.src = src;
+    await new Promise(res => { v.addEventListener('loadeddata', res, { once: true }); v.addEventListener('error', res, { once: true }); setTimeout(res, 5000); });
+    const N = 24, cv = document.createElement('canvas'); cv.width = cv.height = N;
+    const cx = cv.getContext('2d', { willReadFrequently: true });
+    const grab = t => new Promise(res => {
+      let ok = false;
+      const done = () => {
+        if (ok) return; ok = true; v.removeEventListener('seeked', done);
+        try { cx.drawImage(v, 0, 0, N, N); res(cx.getImageData(0, 0, N, N).data); } catch (err) { res(null); }
+      };
+      v.addEventListener('seeked', done); v.currentTime = t; setTimeout(done, 900);
+    });
+    const luma = d => { let s = 0; for (let i = 0; i < d.length; i += 4) s += d[i] * .3 + d[i + 1] * .59 + d[i + 2] * .11; return s / (d.length / 4) / 255; };
+    const diff = (a, b) => { let s = 0; for (let i = 0; i < a.length; i += 4) s += Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]); return s / (a.length / 4) / 765; };
+    const out = [], STEP = .1, DARK = .06;
+
+    // black at the start
+    let lead = 0;
+    for (let t = 0; t < Math.min(4, dur * .3); t += STEP) {
+      const f = await grab(t); if (!f) break;
+      if (luma(f) > DARK) break;
+      lead = t + STEP;
+    }
+    if (lead >= .3) out.push({ side: 'start', at: +lead.toFixed(2), label: 'black start' });
+
+    // the end: last hard change in the final few seconds = where the end card begins
+    const W = Math.min(8, dur * .5), t0 = Math.max(lead, dur - W);
+    const ts = [], fs = [];
+    for (let t = t0; t < dur - .04; t += STEP) { const f = await grab(t); if (!f) break; ts.push(t); fs.push(f); }
+    const G = 3, ch = fs.map((f, i) => i >= G ? diff(f, fs[i - G]) : 0);
+    const sorted = ch.filter(x => x > 0).sort((a, b) => a - b), med = sorted[sorted.length >> 1] || 0;
+    let cut = -1;
+    for (let i = G; i < ch.length; i++) {
+      const tail = dur - ts[i - G + 1];
+      if (ch[i] > .16 && ch[i] > med * 2.5 && tail >= 1 && tail <= 6.5 && ch[i] >= ch[i - 1] && ch[i] >= (ch[i + 1] || 0)) cut = i;
+    }
+    if (cut > 0) {
+      // step back to the exact frame where it changes
+      let k = cut - G + 1;
+      for (let j = cut - G + 1; j <= cut; j++) if (diff(fs[j], fs[j - 1]) > diff(fs[k], fs[k - 1])) k = j;
+      const at = ts[k];
+      out.push({ side: 'end', at: +at.toFixed(2), label: 'end card' });
+    } else {
+      // no card: maybe it fades out to black
+      let i = fs.length - 1;
+      while (i >= 0 && luma(fs[i]) <= DARK) i--;
+      const at = i >= 0 ? ts[i] + STEP : null;
+      if (at != null && dur - at >= .3) out.push({ side: 'end', at: +at.toFixed(2), label: 'black end' });
+    }
+    v.removeAttribute('src'); v.load();
+    return out;
+  })();
+  sugCache.set(src, job);
+  return job;
+}
+
 const fmtT = t => { t = Math.max(0, t); const m = Math.floor(t / 60), s = t - m * 60; return m + ':' + (s < 10 ? '0' : '') + s.toFixed(1); };
 
 function openTrim(it) {
@@ -2321,13 +2396,47 @@ function openTrim(it) {
     oL.style.left = 0; oL.style.width = a + '%';
     oR.style.left = b + '%'; oR.style.width = (100 - b) + '%';
     times.innerHTML = `<span>${fmtT(t.start)}</span><b>${fmtT(t.end - t.start)}</b><span>${fmtT(t.end)}</span>`;
+    for (const q of (typeof sugs !== 'undefined' ? sugs : [])) {
+      const done = q.sg.side === 'end' ? t.end <= q.sg.at + .05 : t.start >= q.sg.at - .05;
+      q.chip.classList.toggle('gone', done); q.reg.classList.toggle('gone', done);
+    }
   };
   S.v.addEventListener('loadedmetadata', () => {
     dur = S.v.duration || 0; fit();
     if (!t || t.end > dur) t = { start: 0, end: dur };
     try { S.v.currentTime = t.start; } catch (err) {}
     draw();
+    showSugs();
   });
+  // suggested cuts, marked right on the timeline; tap the chip to apply
+  let sugs = [];
+  const scan = document.createElement('div'); scan.className = 'tl-scan';
+  const showSugs = () => {
+    scan.textContent = 'looking for cuts…'; tl.append(scan);
+    analyzeEnds(it.src, dur).then(list => {
+      scan.remove();
+      if (!S.ed.isConnected) return;
+      sugs = list.map(sg => {
+        const reg = document.createElement('div'); reg.className = 'tl-sug';
+        const a = sg.side === 'end' ? sg.at : 0, b = sg.side === 'end' ? dur : sg.at;
+        reg.style.left = a / dur * 100 + '%'; reg.style.width = (b - a) / dur * 100 + '%';
+        const chip = document.createElement('div'); chip.className = 'tl-chip';
+        chip.innerHTML = `<i>cut</i>${sg.label} · ${(b - a).toFixed(1)}s`;
+        const mid = (a + b) / 2 / dur * 100;
+        chip.style.left = `clamp(70px, ${mid}%, calc(100% - 70px))`;
+        chip.addEventListener('pointerdown', e => e.stopPropagation());
+        chip.addEventListener('click', e => {
+          e.stopPropagation();
+          if (sg.side === 'end') t.end = Math.max(sg.at, t.start + .2); else t.start = Math.min(sg.at, t.end - .2);
+          seek(t.start); draw();
+        });
+        tl.insertBefore(reg, tl.querySelector('.tl-h'));
+        tl.append(chip);
+        return { sg, reg, chip };
+      });
+      draw();
+    });
+  };
   requestAnimationFrame(fit);
   addEventListener('resize', fit);
 

@@ -26,3 +26,4 @@ Hold a playing window: three bubbles pop out around your finger. Drag onto one a
 - **bottom-left - crop**: full-screen editor. Drag the box or its pink corners; free, 1:1, 4:5, 16:9, 9:16, reset.
 - **bottom-right - trim**: full-screen editor. Drag the pink start/end handles, drag the middle to slide the range, tap to scrub.
 Crop and trim are saved per database item, so the same video can be cut differently in different databases.
+Trim suggestions: the trim editor scans the start and end of the video and marks suggested cuts right on the timeline (red hatching plus a chip): an end card such as Instagram's logo/username outro (found as the last hard change in the final few seconds, so it fits each file), plus black lead-ins and fades to black. Tap a chip to apply it.
