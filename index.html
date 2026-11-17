@@ -2087,7 +2087,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-17-114412';
+const BUILD = '2026-11-17-114921';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
@@ -2848,7 +2848,7 @@ function openPlayback(it) {
 
 
 /* ================= universal adjustments (per database, layered over each video's own edits) ================= */
-const UNI_DEF = { autoEnd: false, autoStart: false, maxLen: 0, ratio: 0, mode: 'off',
+const UNI_DEF = { autoEnd: false, autoStart: false, cutStart: 0, cutEnd: 0, maxLen: 0, ratio: 0, mode: 'off',
                   look: 'none', bri: 100, con: 100, sat: 100, hue: 0, blend: 'normal', corners: 0 };
 const LOOKS = {
   none: '', mono: 'grayscale(1)', noir: 'grayscale(1) contrast(1.45) brightness(.9)',
@@ -2930,6 +2930,9 @@ function computeTrim(o) {
     if (sg.side === 'end' && u.autoEnd) e = Math.min(e, sg.at - CUT_PAD);
     if (sg.side === 'start' && u.autoStart) s = Math.max(s, sg.at + .04);
   }
+  // strict universal trim: the same seconds shaved off every video's start / end
+  if (u.cutStart) s = Math.max(s, Math.min(u.cutStart, dur - .5));
+  if (u.cutEnd) e = Math.min(e, Math.max(dur - u.cutEnd, s + .5));
   if (u.maxLen) e = Math.min(e, s + u.maxLen);
   const full = s < .05 && e > dur - .05;
   const prev = o.et;
@@ -3055,6 +3058,8 @@ function openUniversal() {
   section('length');
   row('cut end cards', toggle('autoEnd'), 'instagram outros & fades to black');
   row('cut black starts', toggle('autoStart'));
+  row('cut off start', chips('cutStart', [['off', 0], ['.5s', .5], ['1s', 1], ['2s', 2], ['3s', 3]]), 'shaves this off the start of every video');
+  row('cut off end', chips('cutEnd', [['off', 0], ['.5s', .5], ['1s', 1], ['2s', 2], ['3s', 3], ['4s', 4], ['5s', 5]]), 'shaves this off the end of every video');
   row('max length', chips('maxLen', [['off', 0], ['3s', 3], ['5s', 5], ['10s', 10], ['15s', 15], ['30s', 30]]), 'loops the first part');
   section('layout');
   const tidy = document.createElement('div'); tidy.className = 'uni-btn'; tidy.textContent = 'tidy up now';
@@ -3064,6 +3069,18 @@ function openUniversal() {
     setTimeout(() => { tidy.textContent = 'tidy up now'; tidy.classList.remove('done'); }, 1200);
   });
   row('arrange', tidy, 'sizes & lines up the open videos once, no cropping');
+  const openAll = document.createElement('div'); openAll.className = 'uni-btn'; openAll.textContent = 'open all';
+  openAll.addEventListener('click', () => {
+    const todo = items.filter(it => !wins.some(o => o.it === it));
+    openAll.textContent = todo.length ? `opening ${todo.length}` : 'all open'; openAll.classList.add('done');
+    // one after another so the iPad isn't asked to start every decoder at once
+    todo.forEach((it, i) => setTimeout(() => {
+      openWin(it, innerWidth * (.25 + Math.random() * .5), innerHeight * (.25 + Math.random() * .5));
+      if (i === todo.length - 1) setTimeout(() => { openAll.textContent = 'open all'; openAll.classList.remove('done'); }, 600);
+    }, i * 140));
+    if (!todo.length) setTimeout(() => { openAll.textContent = 'open all'; openAll.classList.remove('done'); }, 1200);
+  });
+  row('open all', openAll, 'opens every video in this list');
   section('frame');
   row('same crop', chips('ratio', RATIOS), 'centre crop, replaces each crop');
   row('corners', chips('corners', [['square', 0], ['soft', 8], ['round', 18], ['pill', 60]]));
