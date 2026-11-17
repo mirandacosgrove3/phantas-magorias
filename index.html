@@ -2087,7 +2087,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-17-114212';
+const BUILD = '2026-11-17-114323';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
@@ -2148,7 +2148,7 @@ const ICONS = {
 const WIN_MENU = { turn: 'rotate', items: [{ k: 'audio', a: -90 }, { k: 'crop', a: 150 }, { k: 'trim', a: 30 }],
                    subs: [{ k: 'play', parent: 'trim', a: -90 }] };
 // hold a title: a Y. rename up-left, universal (planet) up-right with videos + databases branching off it
-const TITLE_MENU = { turn: 'flip', stem: 70, rest: 56, items: [{ k: 'rename', a: -140 }, { k: 'planet', a: -40 }],
+const TITLE_MENU = { turn: 'flip', rest: 60, core: 30, items: [{ k: 'rename', a: -128 }, { k: 'planet', a: -52 }],
                      subs: [{ k: 'camera', parent: 'planet', a: -68 }, { k: 'files', parent: 'planet', a: 18 }] };
 const SUB_D = 72;
 // resting: bubbles fused into one blob; the one you drag toward stretches out and splits off
@@ -2419,7 +2419,8 @@ function radLoop() {
   const r = rad;
   const step = () => {
     let moving = r.closing;
-    const ck = r.closing ? 0 : (r.hov ? 24 : 27);
+    const base = r.menu.core || 27;
+    const ck = r.closing ? 0 : (r.hov ? base - 3 : base);
     r.coreR += (ck - r.coreR) * .25;
     r.core.setAttribute('r', Math.max(0, r.coreR));
     for (const b of r.all) {
