@@ -429,6 +429,9 @@
   .ed-foot .add { color: rgba(255,255,255,.6); }
   .uni-more { display: flex; justify-content: center; gap: 30px; padding: 14px 0 0; }
   .uni-more span { font-size: 14px; color: rgba(255,255,255,.6); padding: 8px 10px; cursor: pointer; }
+  /* no selection, loupe or callout anywhere except real text fields */
+  *:not(input):not(textarea) { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-user-drag: none; }
+  video, canvas, svg, img { -webkit-touch-callout: none; }
 </style>
 </head>
 <body>
@@ -641,6 +644,14 @@ function apply(o, animate) {
 }
 
 addEventListener('resize', () => { for (const o of wins) apply(o, false); });
+// belt and braces against the iOS loupe: nothing outside a text field may start a selection
+const inField = n => { const el = n && (n.nodeType === 1 ? n : n.parentElement); return !!(el && el.closest && el.closest('input, textarea')); };
+document.addEventListener('selectstart', e => { if (!inField(e.target)) e.preventDefault(); });
+document.addEventListener('contextmenu', e => { if (!inField(e.target)) e.preventDefault(); });
+document.addEventListener('selectionchange', () => {
+  const sel = getSelection();
+  if (sel && sel.rangeCount && !inField(sel.anchorNode) && !inField(document.activeElement)) sel.removeAllRanges();
+});
 const anyAdjusted = () => wins.some(o => o.adjusted);
 
 /* Where the visible title text sits on screen right now (windows try not to cover it). */
@@ -860,7 +871,9 @@ function openWin(it, x, y) {
 
   /* close */
   xb.addEventListener('pointerdown', e => e.stopPropagation());
-  xb.addEventListener('click', e => { e.stopPropagation(); closeWin(o); });
+  xb.addEventListener('pointerup', e => { e.stopPropagation(); closeWin(o); });
+  // the system gets nothing from a press on a video: no loupe, callout or selection (pointer events still work)
+  el.addEventListener('touchstart', e => { if (e.cancelable) e.preventDefault(); }, { passive: false });
 
   /* corner resize */
   rs.addEventListener('pointerdown', e => {
@@ -2069,7 +2082,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-17-112037';
+const BUILD = '2026-11-17-112408';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
