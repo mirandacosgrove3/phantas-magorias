@@ -1926,7 +1926,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-17-095601';
+const BUILD = '2026-11-17-095945';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
@@ -1980,14 +1980,14 @@ const RAD = [
     svg: '<path d="M8 6H5.5v12H8"/><path d="M16 6h2.5v12H16"/><path d="M10.5 12h3"/>' }
 ];
 // resting: three bubbles fused into one blob; the one you drag toward stretches out and splits off
-const RAD_REST = 31, RAD_OUT = 70, RAD_BR = 27;
+const RAD_REST = 54, RAD_OUT = 100, RAD_BR = 31;
 const NS = 'http://www.w3.org/2000/svg';
 let rad = null;
 
 // liquid joins: blur + threshold, then a translucent fill and a hairline rim
 function gooDefs() {
   return `<defs><filter id="rgoo" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB">
-    <feGaussianBlur in="SourceGraphic" stdDeviation="7" result="b"/>
+    <feGaussianBlur in="SourceGraphic" stdDeviation="9" result="b"/>
     <feColorMatrix in="b" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 26 -12" result="g"/>
     <feColorMatrix in="g" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 .8 0" result="fill"/>
     <feMorphology in="g" operator="erode" radius="1" result="e"/>
@@ -2046,8 +2046,8 @@ function openRadial(o, x, y, pid) {
 
 function radPick(fx, fy) {
   const dx = fx - rad.x, dy = fy - rad.y, d = Math.hypot(dx, dy);
-  if (d < 22) return null;
-  if (d > RAD_OUT + 110) return null;
+  if (d < 26) return null;
+  if (d > RAD_OUT + 120) return null;
   const a = Math.atan2(dy, dx);
   let best = null, bd = 1.0;
   for (const b of rad.bubs) {
@@ -2074,8 +2074,8 @@ function radTargets() {
     if (rad.closing) { b.tx = x; b.ty = y; b.tr = 0; continue; }
     if (b === hov) {
       // follows the finger out along its direction, then snaps free
-      const along = Math.min(Math.max(fd, RAD_REST), RAD_OUT + 26);
-      const out = along < RAD_REST + 16 ? along : RAD_OUT + (along - RAD_OUT) * .35;
+      const along = Math.min(Math.max(fd, RAD_REST), RAD_OUT + 30);
+      const out = along < RAD_REST + 20 ? along : RAD_OUT + (along - RAD_OUT) * .35;
       let tx = x + cos * Math.max(out, RAD_REST), ty = y + sin * Math.max(out, RAD_REST);
       // lean a little toward the finger
       tx += (fx - tx) * .18; ty += (fy - ty) * .18;
@@ -2092,7 +2092,7 @@ function radLoop() {
   const r = rad;
   const step = () => {
     let moving = r.closing;
-    const ck = r.closing ? 0 : (r.hov ? 16 : 20);
+    const ck = r.closing ? 0 : (r.hov ? 24 : 27);
     r.coreR += (ck - r.coreR) * .25;
     r.core.setAttribute('r', Math.max(0, r.coreR));
     for (const b of r.bubs) {
