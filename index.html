@@ -453,6 +453,12 @@
   .pf-x { font-size: 12.5px; color: rgba(255,255,255,.45); padding: 8px 6px; cursor: pointer; flex: none; }
   .pf-tip { font-size: 13px; color: rgba(255,255,255,.7); padding: 10px 0; border-bottom: .5px solid rgba(255,255,255,.07); }
   .pf-tip::before { content: "→ "; color: #ff6fb5; }
+  .toast { position: fixed; left: 50%; bottom: calc(26px + env(safe-area-inset-bottom)); z-index: 300000; transform: translate(-50%, 12px);
+           display: flex; gap: 18px; align-items: center; padding: 11px 18px; border-radius: 999px; font-size: 14px; font-weight: 300;
+           background: rgba(20,20,22,.92); box-shadow: inset 0 0 0 .5px rgba(255,255,255,.3); opacity: 0;
+           transition: opacity .25s, transform .35s cubic-bezier(.3,1.4,.45,1); }
+  .toast.on { opacity: 1; transform: translate(-50%, 0); }
+  .toast b { font-weight: 300; color: #2ee6d2; cursor: pointer; padding: 4px 2px; }
 </style>
 </head>
 <body>
@@ -1187,7 +1193,7 @@ list.addEventListener('touchmove', e => {
 list.addEventListener('touchend', e => {
   if (multiTap && e.touches.length === 0) {
     if (performance.now() - multiTap.t < 450) {
-      if (multiTap.n === 2) resetAll();
+      if (multiTap.n === 2) fullReset();
       else if (multiTap.n === 3) toggleFullscreen();
     }
     multiTap = null;
@@ -2088,8 +2094,43 @@ document.addEventListener('keydown', e => {
   if (editing || (e.target && e.target.tagName === 'INPUT')) return;
   if (e.code !== 'Space' && e.key !== ' ') return;
   e.preventDefault();
-  resetAll();
+  fullReset();
 });
+// two-finger tap / spacebar: close everything AND clear every saved edit in this list (crop, trim, mode, universal), with undo
+let undoSnap = null, toastEl = null;
+function fullReset() {
+  if (editing || edOpen) return;
+  const db = curDb();
+  const had = db.items.some(e => e.crop || e.trim || e.mode) || (db.uni && Object.keys(db.uni).length);
+  resetAll();
+  if (!had) return;
+  undoSnap = { id: db.id, uni: db.uni ? { ...db.uni } : null, edits: db.items.map(e => ({ name: e.name, crop: e.crop, trim: e.trim, mode: e.mode })) };
+  for (const e of db.items) { delete e.crop; delete e.trim; delete e.mode; }
+  delete db.uni;
+  saveDbs();
+  items = itemsFromDb(); applyLook(); render();
+  showToast('cleared all edits', 'undo', () => {
+    const d = dbState.dbs.find(x => x.id === undoSnap.id); if (!d) return;
+    if (undoSnap.uni) d.uni = undoSnap.uni;
+    for (const ed of undoSnap.edits) { const e = d.items.find(x => x.name === ed.name); if (!e) continue; for (const k of ['crop', 'trim', 'mode']) if (ed[k]) e[k] = ed[k]; }
+    saveDbs(); undoSnap = null;
+    if (d.id === dbState.current) { items = itemsFromDb(); applyLook(); render(); }
+  });
+}
+function showToast(text, action, fn) {
+  if (toastEl) toastEl.remove();
+  const t = toastEl = document.createElement('div'); t.className = 'toast';
+  t.innerHTML = `<span>${text}</span>`;
+  if (action) {
+    const a = document.createElement('b'); a.textContent = action; t.append(a);
+    a.addEventListener('pointerdown', e => e.stopPropagation());
+    a.addEventListener('click', e => { e.stopPropagation(); fn(); t.classList.remove('on'); setTimeout(() => t.remove(), 300); });
+  }
+  t.addEventListener('pointerdown', e => e.stopPropagation());
+  document.body.append(t);
+  void t.offsetWidth; t.classList.add('on');
+  setTimeout(() => { t.classList.remove('on'); setTimeout(() => t.remove(), 300); }, 5500);
+}
 function resetAll() {
   if (editing || edOpen) return;
   closeRadial(); dropFocus(true);
@@ -2105,7 +2146,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-17-115328';
+const BUILD = '2026-11-17-115924';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
@@ -2928,11 +2969,15 @@ async function scanAll() {
   try {
     for (const it of [...items]) {
       if (autoStore[it.name]) continue;
+      while (document.hidden || wins.filter(o => !o.closed).length >= 3 || (fpsNow().fps && fpsNow().fps < 50))
+        await new Promise(r => setTimeout(r, 1500));
       const u2 = uni(); if (!(u2.autoEnd || u2.autoStart)) break;
       await scanItem(it.name, it.src);
       for (const o of wins) if (o.it.name === it.name && !o.closed) { computeTrim(o); applyMode(o); }
       await new Promise(r => setTimeout(r, 600));
-      while (document.hidden) await new Promise(r => setTimeout(r, 1000));
+      // never compete with playback: wait while the app is hidden, busy, or not running smoothly
+      while (document.hidden || wins.filter(o => !o.closed).length >= 3 || (fpsNow().fps && fpsNow().fps < 50))
+        await new Promise(r => setTimeout(r, 1500));
     }
   } finally { scanning = false; }
 }

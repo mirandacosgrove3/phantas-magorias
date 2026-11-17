@@ -36,3 +36,4 @@ Universal: "tidy up now" (arrange) lays the open videos out once in rows that fi
 The rename bar is now just cancel / iPad keyboard / OK; + videos, databases and the planet live in the title hold menu.
 Universal also has "open all" (opens every video in the list one after another) and "cut off start / cut off end" (a strict number of seconds shaved off every video).
 Memory manager (gauge, branching off the planet below the folder): live fps and stutters, decoding load, estimated video memory; open videos heaviest first with their effects and a close button; playback effects grouped; universal features costed; storage; and tips for what would help most.
+Two-finger tap / spacebar now also clears every saved edit in the current list (crops, trims, playback modes, universal settings), with a few seconds to undo. The background end-card scanner waits while 3+ videos are open or playback isn't smooth.
