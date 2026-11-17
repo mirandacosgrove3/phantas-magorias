@@ -188,6 +188,26 @@
 
   /* bottom-row keyboard icon (summons the iPad's own keyboard) */
   .ctl.kbd svg { width: 26px; height: 26px; display: block; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+  .dbp {
+    position: fixed; z-index: 100002; left: 50%; bottom: calc(84px + env(safe-area-inset-bottom));
+    min-width: 280px; max-width: calc(100vw - 40px); max-height: 60vh; overflow-y: auto; box-sizing: border-box;
+    padding: 10px; border-radius: 20px; background: rgba(0,0,0,.95);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.2), 0 18px 50px rgba(0,0,0,.6);
+    font-weight: 200; transform: translate(-50%, 10px); opacity: 0; pointer-events: none;
+    transition: transform .3s cubic-bezier(.2,.9,.25,1.08), opacity .2s ease;
+  }
+  .dbp.open { transform: translate(-50%, 0); opacity: 1; pointer-events: auto; }
+  .dbp .hd { padding: 6px 14px 6px; font-size: 11px; letter-spacing: .14em; color: rgba(255,255,255,.4); }
+  .dbrow { display: flex; justify-content: space-between; align-items: baseline; gap: 24px; padding: 10px 14px; border-radius: 12px; font-size: 17px; color: rgba(255,255,255,.82); cursor: pointer; }
+  .dbrow .n { font-size: 12px; color: rgba(255,255,255,.38); }
+  .dbrow.cur { color: #ff6fb5; }
+  .dbrow.down { background: rgba(255,255,255,.07); }
+  .dbrow.new { color: rgba(255,255,255,.5); }
+  .dbnew { display: flex; align-items: center; gap: 14px; padding: 4px 8px 8px 14px; }
+  .dbname { flex: 1; min-width: 0; background: transparent; border: 0; border-bottom: 1px solid rgba(255,255,255,.25); border-radius: 0; color: #fff; caret-color: #ff6fb5; font: inherit; font-size: 17px; font-weight: 200; padding: 8px 2px; outline: none; }
+  .dbname::placeholder { color: rgba(255,255,255,.3); }
+  .dbgo { color: #2ee6d2; font-size: 15px; letter-spacing: .04em; cursor: pointer; padding: 8px 2px; text-shadow: 0 0 12px rgba(46,230,210,.5); }
+  .dbgo.down { opacity: .5; }
   #native { position: fixed; left: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; font-size: 16px; border: 0; padding: 0; pointer-events: none; }
 
   /* full keyboard: unfolds out of the wheel's top-left corner and takes over the bottom of the screen */
@@ -385,14 +405,20 @@ picker.addEventListener('change', async () => {
   const files = [...picker.files];
   picker.value = '';
   const fresh = [];
+  let added = false;
   for (const f of files) {
-    if (isDuplicate(f.name, f.size, f.lastModified)) continue;
-    items.push({ name: f.name, title: titleFor(f.name), src: URL.createObjectURL(f), size: f.size, mod: f.lastModified });
-    fresh.push(f);
+    // already stored (same name, or the same file under another name)? share that copy
+    let key = blobs.has(f.name) ? f.name
+      : ([...blobs].find(([, b]) => b.size === f.size && b.mod === f.lastModified) || [])[0];
+    if (!key) {
+      key = f.name;
+      blobs.set(key, { src: URL.createObjectURL(f), size: f.size, mod: f.lastModified });
+      fresh.push(f);
+    }
+    if (addToDb(key)) added = true;
   }
-  if (!fresh.length) return;
-  render();
-  saveFiles(fresh);
+  if (added) { items = itemsFromDb(); render(); }
+  if (fresh.length) saveFiles(fresh);
 });
 
 /* Check whether a video next to this page is reachable */
@@ -941,7 +967,7 @@ list.addEventListener('touchend', e => {
   }
 });
 document.addEventListener('keydown', e => {
-  if (editing) return;
+  if (editing || (e.target && e.target.tagName === 'INPUT')) return;
   if ((e.key === 'f' || e.key === 'F') && !e.metaKey && !e.ctrlKey) toggleFullscreen();
 });
 
@@ -965,18 +991,49 @@ new MutationObserver(() => {
 }).observe(list, { subtree: true, attributes: true, attributeFilter: ['class'] });
 
 /* ================= titles: tap-and-hold to rename ================= */
-const TITLE_KEY = 'phantas-titles';
-let savedTitles = {};
-try { savedTitles = JSON.parse(localStorage.getItem(TITLE_KEY) || '{}') || {}; } catch (err) {}
+/* ================= databases =================
+   Each database is its own list of videos with its own titles. The video files themselves
+   are stored once (by file name) and shared: a file in three databases takes space once. */
+const TITLE_KEY = 'phantas-titles';          // titles from before databases existed (migrated once)
+const DB_KEY = 'phantas-dbs';
+let dbState = { current: 'main', dbs: [{ id: 'main', name: 'main', items: [] }] };
+const blobs = new Map();                      // stored file name -> { src, size, mod }
+const localSrc = new Map();                   // files sitting next to the page (Mac folder mode)
+function saveDbs() { try { localStorage.setItem(DB_KEY, JSON.stringify(dbState)); } catch (err) {} }
+const curDb = () => dbState.dbs.find(d => d.id === dbState.current) || dbState.dbs[0];
+function titleFor(name) { const e = curDb().items.find(x => x.name === name); return (e && e.title) || name; }
 function saveTitle(name, title) {
-  savedTitles[name] = title;
-  try { localStorage.setItem(TITLE_KEY, JSON.stringify(savedTitles)); } catch (err) {}
+  const e = curDb().items.find(x => x.name === name);
+  if (e) { e.title = title; saveDbs(); }
+}
+function addToDb(name) {
+  const db = curDb();
+  if (db.items.some(x => x.name === name)) return false;
+  db.items.push({ name, title: null }); saveDbs();
+  return true;
+}
+function itemsFromDb() {
+  return curDb().items.map(e => {
+    const b = blobs.get(e.name), src = b ? b.src : localSrc.get(e.name);
+    return src ? { name: e.name, title: e.title || e.name, src, size: b && b.size, mod: b && b.mod } : null;
+  }).filter(Boolean);
+}
+function switchDb(id) {
+  if (editing) finishEdit(false);
+  resetAll();                                 // close any open videos from the old list
+  dbState.current = id; saveDbs();
+  items = itemsFromDb();
+  render();
+}
+function createDb(name) {
+  const id = 'db' + Date.now().toString(36);
+  dbState.dbs.push({ id, name: (name || '').trim() || 'list ' + (dbState.dbs.length + 1), items: [] });
+  switchDb(id);
 }
 function splitExt(name) {
   const i = name.lastIndexOf('.');
   return i > 0 ? [name.slice(0, i), name.slice(i)] : [name, ''];
 }
-function titleFor(name) { return savedTitles[name] || name; }
 
 const mk = (cls, text) => { const e = document.createElement('span'); e.className = cls; if (text != null) e.textContent = text; return e; };
 
@@ -1440,7 +1497,12 @@ function buildKb() {
     nativeIn.focus();
     try { nativeIn.setSelectionRange(nativeIn.value.length, nativeIn.value.length); } catch (err) {}
   });
-  bar.append(cancel, add, kbd, enter);
+  const files = document.createElement('div'); files.className = 'ctl kbd files';
+  files.innerHTML = '<svg viewBox="0 0 24 24"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/><path d="M3.5 10.5h17"/></svg>';
+  files.addEventListener('pointerdown', e => { e.stopPropagation(); files.classList.add('down'); });
+  files.addEventListener('pointerup', () => files.classList.remove('down'));
+  files.addEventListener('click', e => { e.stopPropagation(); toggleDbPanel(); });   // a real click so the name field can raise the keyboard
+  bar.append(cancel, add, files, kbd, enter);
   pressable(cancel, () => finishEdit(false));
   pressable(enter, () => finishEdit(true));
   // the file picker needs a real click to open on iPad
@@ -1451,6 +1513,7 @@ function buildKb() {
   document.body.append(bar);
   buildXkb();
   buildNative();
+  buildDbPanel();
   buildRing('inner'); buildRing('outer');
 
   // one-finger spinning of whichever ring you touch; a still tap on a segment spins to it
@@ -1641,6 +1704,56 @@ function toggleXkb(force) {
   if (!open) { cancelAnimationFrame(emoRAF); emoRAF = 0; }
 }
 
+/* ---- databases panel (file icon) ----
+   Lists your databases (current one in pink, with how many videos each holds); tap one to switch.
+   With only one database it goes straight to naming a new one. */
+let dbp = null;
+function buildDbPanel() {
+  dbp = document.createElement('div'); dbp.className = 'dbp';
+  dbp.addEventListener('pointerdown', e => e.stopPropagation());
+  document.body.append(dbp);
+  // tap anywhere else to close it
+  addEventListener('pointerdown', e => {
+    if (dbp.classList.contains('open') && !dbp.contains(e.target) && !e.target.closest('.files')) closeDbPanel();
+  }, true);
+}
+function closeDbPanel() { dbp.classList.remove('open'); const i = dbp.querySelector('input'); if (i) i.blur(); }
+function toggleDbPanel() {
+  if (dbp.classList.contains('open')) { closeDbPanel(); return; }
+  if (dbState.dbs.length <= 1) showNewDb(); else showDbList();
+  dbp.classList.add('open');
+  const i = dbp.querySelector('input'); if (i) i.focus();      // inside the tap, so the iPad keyboard comes up
+}
+function showDbList() {
+  dbp.innerHTML = '';
+  dbp.append(mk('hd', 'databases'));
+  for (const d of dbState.dbs) {
+    const row = mk('dbrow' + (d.id === dbState.current ? ' cur' : ''), '');
+    row.append(mk('nm', d.name), mk('n', String(d.items.length)));
+    pressable(row, () => { closeDbPanel(); if (d.id !== dbState.current) switchDb(d.id); });
+    dbp.append(row);
+  }
+  const nw = mk('dbrow new', '+ new database');
+  nw.addEventListener('pointerdown', e => { e.stopPropagation(); nw.classList.add('down'); });
+  nw.addEventListener('pointerup', () => nw.classList.remove('down'));
+  nw.addEventListener('click', e => { e.stopPropagation(); showNewDb(); dbp.querySelector('input').focus(); });
+  dbp.append(nw);
+}
+function showNewDb() {
+  dbp.innerHTML = '';
+  dbp.append(mk('hd', dbState.dbs.length <= 1 ? 'create a new database' : 'new database'));
+  const wrap = document.createElement('div'); wrap.className = 'dbnew';
+  const input = document.createElement('input');
+  input.className = 'dbname'; input.placeholder = 'name';
+  input.setAttribute('autocapitalize', 'off'); input.setAttribute('autocorrect', 'off'); input.spellcheck = false;
+  const go = mk('dbgo', 'create');
+  const create = () => { closeDbPanel(); createDb(input.value); };
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); create(); } else if (e.key === 'Escape') closeDbPanel(); });
+  pressable(go, create);
+  wrap.append(input, go);
+  dbp.append(wrap);
+}
+
 /* ---- the iPad's own keyboard, via a hidden text field kept in sync with the title ---- */
 function buildNative() {
   nativeIn = document.createElement('input');
@@ -1687,7 +1800,7 @@ buildKb();
 // Hardware keyboard while renaming
 document.addEventListener('keydown', e => {
   if (!editing) return;
-  if (e.target === nativeIn) return;                      // the iPad keyboard types into its own field
+  if (e.target && e.target.tagName === 'INPUT') return;   // text fields (iPad keyboard, database names) type for themselves
   if (e.metaKey || e.ctrlKey) return;
   e.preventDefault(); e.stopPropagation();
   if (e.key === 'Enter') finishEdit(true);
@@ -1699,7 +1812,7 @@ document.addEventListener('keydown', e => {
 
 /* ================= spacebar = reset everything ================= */
 document.addEventListener('keydown', e => {
-  if (editing) return;
+  if (editing || (e.target && e.target.tagName === 'INPUT')) return;
   if (e.code !== 'Space' && e.key !== ' ') return;
   e.preventDefault();
   resetAll();
@@ -1718,7 +1831,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-13-060436';
+const BUILD = '2026-11-17-092155';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
@@ -1742,18 +1855,21 @@ addEventListener('pageshow', e => { if (e.persisted) checkForUpdate(); });
 /* ================= boot ================= */
 (async () => {
   const stored = await loadStored();
-  if (stored.length) {
-    for (const s of stored) {
-      if (isDuplicate(s.name, s.size, s.mod)) continue;
-      items.push({ name: s.name, title: titleFor(s.name), src: URL.createObjectURL(s.blob), size: s.size, mod: s.mod });
-    }
-  } else {
-    const found = await Promise.all(MANIFEST.map(async n => {
-      const src = encodeURI(n);
-      return (await probe(src)) ? { name: n, title: titleFor(n), src } : null;
-    }));
-    items = found.filter(Boolean);
+  for (const s of stored) blobs.set(s.name, { src: URL.createObjectURL(s.blob), size: s.size, mod: s.mod });
+  if (!stored.length) {
+    await Promise.all(MANIFEST.map(async n => { const src = encodeURI(n); if (await probe(src)) localSrc.set(n, src); }));
   }
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(DB_KEY) || 'null'); } catch (err) {}
+  if (saved && Array.isArray(saved.dbs) && saved.dbs.length) dbState = saved;
+  else {
+    let old = {};
+    try { old = JSON.parse(localStorage.getItem(TITLE_KEY) || '{}') || {}; } catch (err) {}
+    const names = stored.length ? stored.map(s => s.name) : [...localSrc.keys()];
+    dbState = { current: 'main', dbs: [{ id: 'main', name: 'main', items: names.map(n => ({ name: n, title: old[n] || null })) }] };
+    saveDbs();
+  }
+  items = itemsFromDb();
   render();
 })();
 render();
