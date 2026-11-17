@@ -49,6 +49,7 @@
     position: fixed;
     background: #000;
     touch-action: none;
+    overflow: hidden;
     box-shadow: 0 0 0 .5px rgba(255,255,255,.35);
   }
   .win.locked {
@@ -267,6 +268,70 @@
     font-size: clamp(36px, 4.3vw, 52px);
     transition: transform .42s cubic-bezier(.3,.7,.2,1), opacity .42s ease-in;
   }
+
+  /* ---- hold menu (bubbles) ---- */
+  .rdim { position: fixed; inset: 0; z-index: 150000; background: rgba(0,0,0,.5); opacity: 0; transition: opacity .22s ease; pointer-events: none; }
+  .rdim.on { opacity: 1; }
+  .rlay { position: fixed; inset: 0; z-index: 150002; touch-action: none; }
+  .rring { position: absolute; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%;
+           box-shadow: 0 0 0 .5px rgba(255,255,255,.7); background: rgba(255,255,255,.06);
+           transform: scale(.4); opacity: 0; transition: transform .3s cubic-bezier(.3,1.55,.45,1), opacity .2s; }
+  .rlay.on .rring { transform: scale(1); opacity: 1; }
+  .rb { position: absolute; left: 0; top: 0; width: 58px; height: 58px; margin: -29px 0 0 -29px; border-radius: 50%;
+        background: rgba(28,28,30,.94); box-shadow: 0 0 0 .5px rgba(255,255,255,.28);
+        display: flex; align-items: center; justify-content: center; opacity: 0;
+        transition: transform .42s cubic-bezier(.3,1.55,.45,1), opacity .2s ease, background .16s ease, box-shadow .16s ease; }
+  .rb svg { width: 24px; height: 24px; fill: none; stroke: #fff; stroke-width: 1.2; stroke-linecap: round; stroke-linejoin: round; transition: stroke .16s; }
+  .rlay.on .rb { opacity: 1; }
+  .rlay.live .rb { transition: transform .2s cubic-bezier(.25,1.3,.5,1), opacity .2s, background .16s, box-shadow .16s; }
+  .rb.hov { background: #fff; box-shadow: 0 0 0 .5px #fff; }
+  .rb.hov svg { stroke: #000; }
+  .rb.on { box-shadow: 0 0 0 1px rgba(255,150,205,.9), 0 0 18px rgba(255,111,181,.35); }
+  .rb.on svg { stroke: #ff8fc6; }
+  .rb.hov.on svg { stroke: #000; }
+  .rlab { position: absolute; left: 0; top: 0; white-space: nowrap; color: #fff; font-weight: 200; font-size: 26px;
+          letter-spacing: .01em; pointer-events: none; opacity: 0; transform: translate(-50%, -100%) translateY(6px);
+          transition: opacity .15s ease, transform .2s ease; }
+  .rlab.on { opacity: 1; transform: translate(-50%, -100%); }
+  .rlay.out .rb, .rlay.out .rring { opacity: 0; transition: opacity .18s ease, transform .2s ease; }
+
+  /* ---- crop / trim editors ---- */
+  .ed { position: fixed; inset: 0; z-index: 200000; background: rgba(0,0,0,.94); color: #fff; font-weight: 300;
+        display: flex; flex-direction: column; align-items: center; opacity: 0; transition: opacity .22s ease; touch-action: none; }
+  .ed.on { opacity: 1; }
+  .ed-stage { flex: 1; width: 100%; display: flex; align-items: center; justify-content: center; min-height: 0;
+              transform: scale(.94); transition: transform .38s cubic-bezier(.3,1.4,.45,1); }
+  .ed.on .ed-stage { transform: scale(1); }
+  .ed-box { position: relative; background: #000; }
+  .ed-box.clip { overflow: hidden; }
+  .ed-box video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; pointer-events: none; }
+  .cr { position: absolute; box-shadow: 0 0 0 9999px rgba(0,0,0,.62), inset 0 0 0 .5px rgba(255,255,255,.9); touch-action: none; }
+  .cr i { position: absolute; background: rgba(255,255,255,.22); }
+  .cr .g1, .cr .g2 { top: 0; bottom: 0; width: .5px; } .cr .g1 { left: 33.33%; } .cr .g2 { left: 66.66%; }
+  .cr .g3, .cr .g4 { left: 0; right: 0; height: .5px; } .cr .g3 { top: 33.33%; } .cr .g4 { top: 66.66%; }
+  .ch { position: absolute; width: 44px; height: 44px; touch-action: none; }
+  .ch::after { content: ""; position: absolute; width: 18px; height: 18px; border: 0 solid #ff6fb5; }
+  .ch.k-tl { left: -22px; top: -22px; }  .ch.k-tl::after { left: 21px; top: 21px; border-left-width: 1.5px; border-top-width: 1.5px; }
+  .ch.k-tr { right: -22px; top: -22px; } .ch.k-tr::after { right: 21px; top: 21px; border-right-width: 1.5px; border-top-width: 1.5px; }
+  .ch.k-bl { left: -22px; bottom: -22px; } .ch.k-bl::after { left: 21px; bottom: 21px; border-left-width: 1.5px; border-bottom-width: 1.5px; }
+  .ch.k-br { right: -22px; bottom: -22px; } .ch.k-br::after { right: 21px; bottom: 21px; border-right-width: 1.5px; border-bottom-width: 1.5px; }
+  .ed-tools, .ed-foot, .tl-wrap { position: relative; z-index: 2; }
+  .ed-tools { display: flex; gap: 6px; padding: 14px 0 4px; font-size: 14px; letter-spacing: .02em; }
+  .ed-tools span { padding: 8px 12px; color: rgba(255,255,255,.55); cursor: pointer; }
+  .ed-tools span.sel { color: #ff6fb5; }
+  .ed-foot { display: flex; gap: 64px; padding: 10px 0 calc(22px + env(safe-area-inset-bottom)); font-size: 15px; }
+  .ed-foot span { padding: 10px 14px; cursor: pointer; }
+  .ed-foot .no { color: #ff3b4a; } .ed-foot .ok { color: #2ee6d2; }
+  .tl-wrap { width: min(720px, calc(100vw - 80px)); padding-top: 18px; }
+  .tl { position: relative; height: 46px; touch-action: none; }
+  .tl-track { position: absolute; inset: 0; box-shadow: inset 0 0 0 .5px rgba(255,255,255,.35); }
+  .tl-sel { position: absolute; top: 0; bottom: 0; border-top: 1px solid #ff6fb5; border-bottom: 1px solid #ff6fb5; background: rgba(255,111,181,.07); }
+  .tl-out { position: absolute; top: 0; bottom: 0; background: rgba(0,0,0,.55); }
+  .tl-h { position: absolute; top: -10px; bottom: -10px; width: 44px; margin-left: -22px; touch-action: none; }
+  .tl-h::after { content: ""; position: absolute; left: 21.25px; top: 4px; bottom: 4px; width: 1.5px; background: #ff6fb5; border-radius: 1px; }
+  .tl-ph { position: absolute; top: -4px; bottom: -4px; width: 1px; background: #fff; pointer-events: none; }
+  .tl-t { display: flex; justify-content: space-between; font-size: 13px; color: rgba(255,255,255,.6); padding-top: 12px; font-variant-numeric: tabular-nums; }
+  .tl-t b { font-weight: 300; color: #fff; }
 </style>
 </head>
 <body>
@@ -649,7 +714,8 @@ function openWin(it, x, y) {
 
   v.addEventListener('loadedmetadata', () => {
     if (!v.videoWidth) return;
-    o.aspect = v.videoWidth / v.videoHeight;
+    applyCrop(o, false);
+    if (o.it.trim) try { v.currentTime = o.it.trim.start; } catch (err) {}
     if (o.adjusted) { o.h = o.w / o.aspect; apply(o, false); }
     else relayout(o);
   });
@@ -719,11 +785,12 @@ function openWin(it, x, y) {
     clearTimeout(o.holdT);
     // hold still on a window = lock the sound to it
     if (pts.size === 1) o.holdT = setTimeout(() => {
-      if (start && !start.moved && pts.size === 1) { start.moved = true; setLock(o); }
+      if (start && !start.moved && pts.size === 1) { start.moved = true; const q = pts.get(e.pointerId) || start.p0; openRadial(o, q.x, q.y, e.pointerId); }
     }, 520);
   });
   el.addEventListener('pointermove', e => {
     if (!pts.has(e.pointerId)) return;
+    if (rad && rad.o === o && rad.pid === e.pointerId) { pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); radMove(e.clientX, e.clientY); return; }
     pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
     const p = [...pts.values()];
     if (start.n >= 2 && p.length >= 2) {
@@ -744,6 +811,7 @@ function openWin(it, x, y) {
   const end = e => {
     clearTimeout(o.holdT);
     if (!pts.has(e.pointerId)) return;
+    if (rad && rad.o === o && rad.pid === e.pointerId) radRelease(e.type === 'pointerup');
     pts.delete(e.pointerId);
     if (pts.size === 0) {
       if (!start.moved && performance.now() - start.t < 350 && e.type === 'pointerup') onTap();
@@ -1018,7 +1086,7 @@ function addToDb(name) {
 function itemsFromDb() {
   return curDb().items.map(e => {
     const b = blobs.get(e.name), src = b ? b.src : localSrc.get(e.name);
-    return src ? { name: e.name, title: e.title || e.name, src, size: b && b.size, mod: b && b.mod } : null;
+    return src ? { name: e.name, title: e.title || e.name, src, size: b && b.size, mod: b && b.mod, crop: e.crop || null, trim: e.trim || null } : null;
   }).filter(Boolean);
 }
 function switchDb(id) {
@@ -1860,7 +1928,8 @@ document.addEventListener('keydown', e => {
   resetAll();
 });
 function resetAll() {
-  if (editing) return;
+  if (editing || edOpen) return;
+  closeRadial();
   unlock();
   [...wins].forEach(o => { o.closed = true; o.v.pause(); o.v.removeAttribute('src'); o.v.load(); o.el.remove(); });
   wins.length = 0;
@@ -1873,7 +1942,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-17-092731';
+const BUILD = '2026-11-17-094500';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
@@ -1915,6 +1984,363 @@ addEventListener('pageshow', e => { if (e.persisted) checkForUpdate(); });
   render();
 })();
 render();
+
+/* ================= hold menu: bubbles around the finger ================= */
+// Hold a window: three bubbles pop out. Drag onto one and let go, or let go in the middle and tap one.
+const RAD = [
+  { k: 'audio', a: -90, lab: 'sound',
+    svg: '<path d="M4 9.5h3l4.5-3.8v12.6L7 14.5H4z"/><path d="M15 9.4a3.6 3.6 0 0 1 0 5.2"/><path d="M17.4 7a7 7 0 0 1 0 10"/>' },
+  { k: 'crop', a: 150, lab: 'crop',
+    svg: '<path d="M7 3v14h14"/><path d="M3 7h14v14"/>' },
+  { k: 'trim', a: 30, lab: 'trim',
+    svg: '<path d="M8 6H5.5v12H8"/><path d="M16 6h2.5v12H16"/><path d="M10.5 12h3"/>' }
+];
+const RAD_R = 92;
+let rad = null;
+
+function openRadial(o, x, y, pid) {
+  closeRadial(true);
+  if (navigator.vibrate) try { navigator.vibrate(8); } catch (err) {}
+  // turn the whole fan if it would leave the screen
+  const fits = rot => RAD.every(b => {
+    const a = (b.a + rot) * Math.PI / 180, bx = x + Math.cos(a) * RAD_R, by = y + Math.sin(a) * RAD_R;
+    return bx > 40 && bx < innerWidth - 40 && by > 70 && by < innerHeight - 40;
+  });
+  const rot = [0, 180, 90, -90, 45, -45, 135, -135].find(fits) || 0;
+
+  const dim = document.createElement('div'); dim.className = 'rdim';
+  const lay = document.createElement('div'); lay.className = 'rlay';
+  const ring = document.createElement('div'); ring.className = 'rring';
+  ring.style.left = x + 'px'; ring.style.top = y + 'px';
+  const lab = document.createElement('div'); lab.className = 'rlab';
+  lay.append(ring);
+  const bubs = RAD.map((b, i) => {
+    const a = (b.a + rot) * Math.PI / 180;
+    const el = document.createElement('div'); el.className = 'rb';
+    el.innerHTML = `<svg viewBox="0 0 24 24">${b.svg}</svg>`;
+    el.style.transitionDelay = (i * 35) + 'ms';
+    el.style.transform = `translate(${x}px, ${y}px) scale(.3)`;
+    if (b.k === 'audio' && lockWin === o) el.classList.add('on');
+    lay.append(el);
+    return { ...b, el, ang: a, hx: x + Math.cos(a) * RAD_R, hy: y + Math.sin(a) * RAD_R };
+  });
+  lay.append(lab);
+  document.body.append(dim, lay);
+  o.el.style.zIndex = 150001;
+  rad = { o, x, y, pid, dim, lay, lab, bubs, hov: null, dragging: true, fx: x, fy: y };
+  void lay.offsetWidth;
+  dim.classList.add('on'); lay.classList.add('on');
+  radDraw();
+  setTimeout(() => { if (rad && rad.lay === lay) { lay.classList.add('live'); bubs.forEach(b => b.el.style.transitionDelay = ''); } }, 300);
+
+  // after letting go in the middle: tap a bubble, or anywhere else to close
+  lay.addEventListener('pointerdown', e => {
+    e.stopPropagation(); e.preventDefault();
+    if (!rad || rad.dragging) return;
+    const b = e.target.closest('.rb');
+    const hit = b && rad.bubs.find(q => q.el === b);
+    if (hit) { rad.hov = hit; radDraw(); radRun(hit); } else closeRadial();
+  });
+  lay.addEventListener('click', e => e.stopPropagation());
+}
+
+function radPick(fx, fy) {
+  const dx = fx - rad.x, dy = fy - rad.y, d = Math.hypot(dx, dy);
+  if (d < 30) return null;
+  const a = Math.atan2(dy, dx);
+  let best = null, bd = 1.0;
+  for (const b of rad.bubs) {
+    const diff = Math.abs(Math.atan2(Math.sin(a - b.ang), Math.cos(a - b.ang)));
+    if (diff < bd) { bd = diff; best = b; }
+  }
+  // too far past the bubble = not choosing it
+  if (best && d > RAD_R + 90) return null;
+  return best;
+}
+
+function radMove(fx, fy) {
+  if (!rad) return;
+  rad.fx = fx; rad.fy = fy;
+  const h = radPick(fx, fy);
+  if (h !== rad.hov) { rad.hov = h; if (h && navigator.vibrate) try { navigator.vibrate(4); } catch (err) {} }
+  radDraw();
+}
+
+function radDraw() {
+  if (!rad) return;
+  const { bubs, hov, fx, fy, lab } = rad;
+  for (const b of bubs) {
+    // bubbles lean toward the finger like they're on a soft string
+    let ox = 0, oy = 0;
+    const dx = fx - b.hx, dy = fy - b.hy, d = Math.hypot(dx, dy);
+    const reach = b === hov ? 220 : 150, pull = b === hov ? 22 : 9;
+    if (rad.dragging && d > 0.5 && d < reach) { const k = pull * (1 - d / reach) * Math.min(1, d / 30); ox = dx / d * k; oy = dy / d * k; }
+    const s = b === hov ? 1.24 : (hov ? 0.92 : 1);
+    b.el.style.transform = `translate(${b.hx + ox}px, ${b.hy + oy}px) scale(${s})`;
+    b.el.classList.toggle('hov', b === hov);
+  }
+  if (hov) {
+    lab.textContent = hov.k === 'audio' && lockWin === rad.o ? 'sound off' : hov.lab;
+    const top = Math.min(...bubs.map(b => b.hy));
+    lab.style.left = Math.min(Math.max(hov.hx, 90), innerWidth - 90) + 'px';
+    lab.style.top = (Math.min(top, hov.hy) - 44) + 'px';
+    lab.classList.add('on');
+  } else lab.classList.remove('on');
+}
+
+function radRelease(isUp) {
+  if (!rad) return;
+  rad.dragging = false;
+  if (isUp && rad.hov) { radRun(rad.hov); return; }
+  const d = Math.hypot(rad.fx - rad.x, rad.fy - rad.y);
+  if (!isUp || d > 40) { closeRadial(); return; }
+  // let go in the middle: menu stays for tapping
+  rad.hov = null; radDraw();
+}
+
+function radRun(b) {
+  const o = rad.o;
+  b.el.style.transform += ' scale(1.08)';
+  setTimeout(() => {
+    closeRadial();
+    if (o.closed) return;
+    if (b.k === 'audio') { if (lockWin === o) unlock(); else setLock(o); }
+    else if (b.k === 'crop') openCrop(o.it);
+    else if (b.k === 'trim') openTrim(o.it);
+  }, 120);
+}
+
+function closeRadial(now) {
+  if (!rad) return;
+  const r = rad; rad = null;
+  if (!r.o.closed) r.o.el.style.zIndex = r.o.z;
+  r.lay.classList.add('out'); r.dim.classList.remove('on'); r.lab.classList.remove('on');
+  r.bubs.forEach(b => b.el.style.transform = `translate(${r.x}px, ${r.y}px) scale(.4)`);
+  r.lay.style.pointerEvents = 'auto';
+  const kill = () => { r.lay.remove(); r.dim.remove(); };
+  if (now) kill(); else setTimeout(kill, 260);
+}
+
+/* ================= crop + trim (saved per database item) ================= */
+let edOpen = false;
+
+function saveItemMeta(it, key, val) {
+  it[key] = val;
+  const e = curDb().items.find(x => x.name === it.name);
+  if (e) { if (val) e[key] = val; else delete e[key]; saveDbs(); }
+  for (const o of wins) if (o.it.name === it.name) {
+    o.it[key] = val;
+    if (key === 'crop') applyCrop(o, true);
+    if (key === 'trim' && val) try { o.v.currentTime = val.start; } catch (err) {}
+  }
+}
+
+// Show only the cropped part of the video inside its window, and size the window to it.
+function applyCrop(o, animate) {
+  const c = o.it.crop, v = o.v;
+  if (c) Object.assign(v.style, { position: 'absolute', objectFit: 'fill', maxWidth: 'none',
+    width: 100 / c.w + '%', height: 100 / c.h + '%', left: -c.x / c.w * 100 + '%', top: -c.y / c.h * 100 + '%' });
+  else v.style.cssText = '';
+  if (!v.videoWidth) return;
+  const old = o.aspect;
+  o.aspect = c ? (v.videoWidth * c.w) / (v.videoHeight * c.h) : v.videoWidth / v.videoHeight;
+  if (animate && Math.abs(old - o.aspect) > 1e-3) {
+    // keep the window's area roughly the same and its centre where it was
+    const cx = o.left + o.w / 2, cy = o.top + o.h / 2, area = o.w * o.h;
+    o.w = Math.sqrt(area * o.aspect); o.h = o.w / o.aspect;
+    o.left = cx - o.w / 2; o.top = cy - o.h / 2;
+    apply(o, true);
+  }
+}
+
+// keep trimmed windows looping inside their range
+setInterval(() => {
+  for (const o of wins) {
+    const t = o.it.trim; if (!t || o.closed) continue;
+    const ct = o.v.currentTime;
+    if (ct >= t.end - 0.04 || ct < t.start - 0.3) try { o.v.currentTime = t.start; } catch (err) {}
+  }
+}, 80);
+
+function edShell(it, onOk, onReset) {
+  closeRadial(true);
+  edOpen = true;
+  const ed = document.createElement('div'); ed.className = 'ed';
+  const stage = document.createElement('div'); stage.className = 'ed-stage';
+  const tools = document.createElement('div'); tools.className = 'ed-tools';
+  const foot = document.createElement('div'); foot.className = 'ed-foot';
+  const no = document.createElement('span'); no.className = 'no'; no.textContent = 'cancel';
+  const ok = document.createElement('span'); ok.className = 'ok'; ok.textContent = 'ok';
+  foot.append(no, ok);
+  ed.append(stage, tools, foot);
+  const v = document.createElement('video');
+  v.src = it.src; v.muted = true; v.loop = true; v.playsInline = true; v.setAttribute('playsinline', ''); v.autoplay = true;
+  document.body.append(ed);
+  void ed.offsetWidth; ed.classList.add('on');
+  v.play().catch(() => {});
+  const close = () => {
+    edOpen = false; ed.classList.remove('on');
+    setTimeout(() => { v.pause(); v.removeAttribute('src'); v.load(); ed.remove(); }, 240);
+  };
+  ['pointerdown', 'click'].forEach(t => ed.addEventListener(t, e => e.stopPropagation()));
+  no.addEventListener('click', close);
+  ok.addEventListener('click', () => { onOk(); close(); });
+  const tool = (label, fn) => { const s = document.createElement('span'); s.textContent = label; s.addEventListener('click', () => fn(s)); tools.append(s); return s; };
+  return { ed, stage, tools, v, tool, close };
+}
+
+function drag(el, onMove, onDown) {
+  el.addEventListener('pointerdown', e => {
+    e.stopPropagation(); e.preventDefault();
+    el.setPointerCapture(e.pointerId);
+    const sx = e.clientX, sy = e.clientY;
+    if (onDown) onDown(e);
+    const mv = ev => onMove(ev.clientX - sx, ev.clientY - sy, ev);
+    const up = () => { el.removeEventListener('pointermove', mv); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up); };
+    el.addEventListener('pointermove', mv); el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+  });
+}
+
+function openCrop(it) {
+  let c = it.crop ? { ...it.crop } : { x: 0, y: 0, w: 1, h: 1 };
+  let ratio = null;                   // output w/h, null = free
+  const S = edShell(it, () => saveItemMeta(it, 'crop', (c.w > 0.995 && c.h > 0.995) ? null : { ...c }));
+  const box = document.createElement('div'); box.className = 'ed-box';
+  const cr = document.createElement('div'); cr.className = 'cr';
+  cr.innerHTML = '<i class="g1"></i><i class="g2"></i><i class="g3"></i><i class="g4"></i>';
+  const hs = ['tl', 'tr', 'bl', 'br'].map(k => { const h = document.createElement('div'); h.className = 'ch k-' + k; h.dataset.k = k; cr.append(h); return h; });
+  box.append(S.v, cr); S.stage.append(box);
+  let bw = 0, bh = 0, va = 16 / 9;
+  const fit = () => {
+    if (S.v.videoWidth) va = S.v.videoWidth / S.v.videoHeight;
+    const mw = innerWidth - 80, mh = S.stage.clientHeight - 60;
+    bw = Math.min(mw, mh * va); bh = bw / va;
+    box.style.width = bw + 'px'; box.style.height = bh + 'px';
+    draw();
+  };
+  const draw = () => Object.assign(cr.style, { left: c.x * bw + 'px', top: c.y * bh + 'px', width: c.w * bw + 'px', height: c.h * bh + 'px' });
+  S.v.addEventListener('loadedmetadata', fit);
+  requestAnimationFrame(fit);
+  const q = () => ratio / va;          // ratio in 0..1 crop units (w/h)
+  const MIN = 0.08;
+
+  drag(cr, (dx, dy) => {
+    c.x = Math.min(Math.max(c0.x + dx / bw, 0), 1 - c.w);
+    c.y = Math.min(Math.max(c0.y + dy / bh, 0), 1 - c.h); draw();
+  }, () => { c0 = { ...c }; });
+  let c0 = null;
+  hs.forEach(h => drag(h, (dx, dy) => {
+    const k = h.dataset.k, L = k[1] === 'l', T = k[0] === 't';
+    // the opposite corner stays put
+    const ax = L ? c0.x + c0.w : c0.x, ay = T ? c0.y + c0.h : c0.y;
+    let px = (L ? c0.x : c0.x + c0.w) + dx / bw, py = (T ? c0.y : c0.y + c0.h) + dy / bh;
+    px = Math.min(Math.max(px, 0), 1); py = Math.min(Math.max(py, 0), 1);
+    let w = Math.max(Math.abs(px - ax), MIN), hh = Math.max(Math.abs(py - ay), MIN);
+    if (ratio) {
+      const maxW = L ? ax : 1 - ax, maxH = T ? ay : 1 - ay;
+      if (w / hh > q()) hh = w / q(); else w = hh * q();
+      const s = Math.min(1, maxW / w, maxH / hh); w *= s; hh *= s;
+    }
+    c = { x: L ? ax - w : ax, y: T ? ay - hh : ay, w, h: hh }; draw();
+  }, () => { c0 = { ...c }; }));
+
+  const presets = [];
+  const setRatio = (r, s) => {
+    ratio = r; presets.forEach(p => p.classList.toggle('sel', p === s));
+    if (!r) return;
+    const qq = q(); let w, hh;
+    if (qq >= 1) { w = 1; hh = 1 / qq; } else { hh = 1; w = qq; }
+    // shrink toward the current centre
+    const cx = c.x + c.w / 2, cy = c.y + c.h / 2;
+    c = { w, h: hh, x: Math.min(Math.max(cx - w / 2, 0), 1 - w), y: Math.min(Math.max(cy - hh / 2, 0), 1 - hh) };
+    draw();
+  };
+  presets.push(S.tool('free', s => setRatio(null, s)));
+  [['1:1', 1], ['4:5', .8], ['16:9', 16 / 9], ['9:16', 9 / 16]].forEach(([l, r]) => presets.push(S.tool(l, s => setRatio(r, s))));
+  presets[0].classList.add('sel');
+  S.tool('reset', () => { setRatio(null, presets[0]); c = { x: 0, y: 0, w: 1, h: 1 }; draw(); });
+  addEventListener('resize', fit);
+}
+
+const fmtT = t => { t = Math.max(0, t); const m = Math.floor(t / 60), s = t - m * 60; return m + ':' + (s < 10 ? '0' : '') + s.toFixed(1); };
+
+function openTrim(it) {
+  let dur = 0, t = it.trim ? { ...it.trim } : null;
+  const S = edShell(it, () => {
+    if (!dur) return;
+    saveItemMeta(it, 'trim', (t.start < 0.05 && t.end > dur - 0.05) ? null : { start: +t.start.toFixed(2), end: +t.end.toFixed(2) });
+  });
+  const box = document.createElement('div'); box.className = 'ed-box clip';
+  box.append(S.v); S.stage.append(box);
+  const wrap = document.createElement('div'); wrap.className = 'tl-wrap';
+  const tl = document.createElement('div'); tl.className = 'tl';
+  tl.innerHTML = '<div class="tl-track"></div><div class="tl-out l"></div><div class="tl-out r"></div><div class="tl-sel"></div><div class="tl-ph"></div>';
+  const hA = document.createElement('div'); hA.className = 'tl-h';
+  const hB = document.createElement('div'); hB.className = 'tl-h';
+  tl.append(hA, hB);
+  const times = document.createElement('div'); times.className = 'tl-t';
+  wrap.append(tl, times);
+  S.ed.insertBefore(wrap, S.ed.children[1]);
+  const [oL, oR, sel, ph] = ['.tl-out.l', '.tl-out.r', '.tl-sel', '.tl-ph'].map(s => tl.querySelector(s));
+
+  const fit = () => {
+    const va = S.v.videoWidth ? S.v.videoWidth / S.v.videoHeight : 16 / 9;
+    const mw = innerWidth - 80, mh = S.stage.clientHeight - 40;
+    const bw = Math.min(mw, mh * va);
+    box.style.width = bw + 'px'; box.style.height = bw / va + 'px';
+  };
+  const draw = () => {
+    if (!dur) return;
+    const a = t.start / dur * 100, b = t.end / dur * 100;
+    hA.style.left = a + '%'; hB.style.left = b + '%';
+    sel.style.left = a + '%'; sel.style.width = (b - a) + '%';
+    oL.style.left = 0; oL.style.width = a + '%';
+    oR.style.left = b + '%'; oR.style.width = (100 - b) + '%';
+    times.innerHTML = `<span>${fmtT(t.start)}</span><b>${fmtT(t.end - t.start)}</b><span>${fmtT(t.end)}</span>`;
+  };
+  S.v.addEventListener('loadedmetadata', () => {
+    dur = S.v.duration || 0; fit();
+    if (!t || t.end > dur) t = { start: 0, end: dur };
+    try { S.v.currentTime = t.start; } catch (err) {}
+    draw();
+  });
+  requestAnimationFrame(fit);
+  addEventListener('resize', fit);
+
+  // preview loops inside the range; playhead follows
+  const tick = () => {
+    if (!S.ed.isConnected) return;
+    if (dur && t) {
+      const ct = S.v.currentTime;
+      if (!scrub && (ct >= t.end - 0.03 || ct < t.start - 0.1)) try { S.v.currentTime = t.start; } catch (err) {}
+      ph.style.left = (S.v.currentTime / dur * 100) + '%';
+    }
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+
+  let scrub = false, t0 = null;
+  const W = () => tl.clientWidth;
+  const MINL = 0.2;
+  drag(hA, dx => { t.start = Math.min(Math.max(t0.start + dx / W() * dur, 0), t.end - MINL); seek(t.start); draw(); }, () => { t0 = { ...t }; scrub = true; });
+  drag(hB, dx => { t.end = Math.max(Math.min(t0.end + dx / W() * dur, dur), t.start + MINL); seek(t.end - 0.05); draw(); }, () => { t0 = { ...t }; scrub = true; });
+  // drag the pink middle to slide the whole range; tap the track to jump the playhead
+  drag(tl, (dx, dy, ev) => {
+    if (t0.mid) {
+      const len = t0.end - t0.start;
+      const s = Math.min(Math.max(t0.start + dx / W() * dur, 0), dur - len);
+      t.start = s; t.end = s + len; seek(s); draw();
+    } else seek(Math.min(Math.max((ev.clientX - tl.getBoundingClientRect().left) / W() * dur, t.start), t.end));
+  }, e => {
+    const r = tl.getBoundingClientRect(), at = (e.clientX - r.left) / W() * dur;
+    t0 = { ...t, mid: at > t.start && at < t.end && (t.end - t.start) < dur - 0.05 };
+    scrub = true;
+    if (!t0.mid) seek(Math.min(Math.max(at, t.start), t.end));
+  });
+  ['pointerup', 'pointercancel'].forEach(k => S.ed.addEventListener(k, () => { scrub = false; }, true));
+  const seek = x => { try { S.v.currentTime = x; } catch (err) {} };
+  S.tool('reset', () => { if (dur) { t = { start: 0, end: dur }; draw(); } });
+}
 </script>
 </body>
 </html>

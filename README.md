@@ -19,3 +19,10 @@ Minimal video-title player for iPad. Thin white text on black; tap a title to op
 Edit `index.html` on github.com (press `.` for the editor); Pages redeploys on each commit.
 
 **After editing by hand, change the `BUILD` stamp in index.html** (any new value). The installed iPad app compares it against the live copy on launch and reloads itself when it differs.
+
+## Hold menu (crop / trim / sound)
+Hold a playing window: three bubbles pop out around your finger. Drag onto one and let go, or let go in the middle and tap one.
+- **top - sound**: locks the audio to that window (pink border). Pick it again to unlock.
+- **bottom-left - crop**: full-screen editor. Drag the box or its pink corners; free, 1:1, 4:5, 16:9, 9:16, reset.
+- **bottom-right - trim**: full-screen editor. Drag the pink start/end handles, drag the middle to slide the range, tap to scrub.
+Crop and trim are saved per database item, so the same video can be cut differently in different databases.
