@@ -328,6 +328,9 @@
   .tl-chip.gone, .tl-sug.gone { opacity: 0; pointer-events: none; }
   .tl-scan { position: absolute; bottom: calc(100% + 14px); right: 0; font-size: 12px; color: rgba(255,255,255,.35); }
   @keyframes chipin { from { opacity: 0; transform: translateX(-50%) translateY(6px) scale(.85); } }
+  .fxc { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  .win.fx video, .ed-box.fx video { opacity: 0; }
+  .ed-tools.modes { flex-wrap: wrap; justify-content: center; max-width: 92vw; }
 </style>
 </head>
 <body>
@@ -712,6 +715,7 @@ function openWin(it, x, y) {
     if (!v.videoWidth) return;
     applyCrop(o, false);
     if (o.it.trim) try { v.currentTime = o.it.trim.start; } catch (err) {}
+    if (o.it.mode) applyMode(o);
     if (o.adjusted) { o.h = o.w / o.aspect; apply(o, false); }
     else relayout(o);
   });
@@ -1082,7 +1086,7 @@ function addToDb(name) {
 function itemsFromDb() {
   return curDb().items.map(e => {
     const b = blobs.get(e.name), src = b ? b.src : localSrc.get(e.name);
-    return src ? { name: e.name, title: e.title || e.name, src, size: b && b.size, mod: b && b.mod, crop: e.crop || null, trim: e.trim || null } : null;
+    return src ? { name: e.name, title: e.title || e.name, src, size: b && b.size, mod: b && b.mod, crop: e.crop || null, trim: e.trim || null, mode: e.mode || null } : null;
   }).filter(Boolean);
 }
 function switchDb(id) {
@@ -1938,7 +1942,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-17-100358';
+const BUILD = '2026-11-17-101359';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
@@ -1989,8 +1993,11 @@ const RAD = [
   { k: 'crop', a: 150,
     svg: '<path d="M7 3v14h14"/><path d="M3 7h14v14"/>' },
   { k: 'trim', a: 30,
-    svg: '<path d="M8 6H5.5v12H8"/><path d="M16 6h2.5v12H16"/><path d="M10.5 12h3"/>' }
+    svg: '<circle cx="6.5" cy="6.5" r="2.6"/><circle cx="6.5" cy="17.5" r="2.6"/><path d="M8.6 8.1 20 17"/><path d="M8.6 15.9 20 7"/>' }
 ];
+// second level: sprouts out of trim; hold, drag to trim, then up to it
+const RAD_SUB = { k: 'play', parent: 'trim', svg: '<path d="M8.5 6.2v11.6L18 12z"/>' };
+const SUB_D = 70;
 // resting: three bubbles fused into one blob; the one you drag toward stretches out and splits off
 const RAD_REST = 54, RAD_OUT = 100, RAD_BR = 31;
 const NS = 'http://www.w3.org/2000/svg';
@@ -2037,9 +2044,18 @@ function openRadial(o, x, y, pid) {
     lay.append(ic);
     return { ...b, ang, c, ic, px: x, py: y, vx: 0, vy: 0, r: 4, vr: 0, tx: x, ty: y, tr: RAD_BR };
   });
+  // the playback bubble hides inside trim until trim is pulled out
+  const par = bubs.find(b => b.k === RAD_SUB.parent);
+  const sc = document.createElementNS(NS, 'circle'); sc.setAttribute('fill', 'rgb(30,30,34)'); g.append(sc);
+  const sic = document.createElement('div'); sic.className = 'ri'; sic.innerHTML = `<svg viewBox="0 0 24 24">${RAD_SUB.svg}</svg>`;
+  lay.append(sic);
+  const P = { x: x + Math.cos(par.ang) * RAD_OUT, y: y + Math.sin(par.ang) * RAD_OUT };
+  const up = P.y - SUB_D > 50 ? -1 : 1;
+  const sub = { ...RAD_SUB, c: sc, ic: sic, px: x, py: y, vx: 0, vy: 0, r: 0, vr: 0, tx: x, ty: y, tr: 0,
+                anchor: P, home: { x: P.x, y: P.y + up * SUB_D }, up };
   document.body.append(dim, lay);
   o.el.style.zIndex = 150001;
-  rad = { o, x, y, pid, dim, lay, bubs, core, coreR: 4, hov: null, dragging: true, fx: x, fy: y, closing: false, raf: 0 };
+  rad = { o, x, y, pid, dim, lay, bubs, sub, par, all: [...bubs, sub], armed: false, core, coreR: 4, hov: null, dragging: true, fx: x, fy: y, closing: false, raf: 0 };
   void dim.offsetWidth; dim.classList.add('on');
   radTargets();
   radLoop();
@@ -2049,7 +2065,10 @@ function openRadial(o, x, y, pid) {
   lay.addEventListener('pointerup', e => {
     e.stopPropagation();
     if (!rad || rad.lay !== lay || rad.dragging) return;
-    const hit = rad.bubs.find(b => Math.hypot(e.clientX - b.px, e.clientY - b.py) < RAD_BR + 8);
+    const hit = rad.all.find(b => b.r > 8 && Math.hypot(e.clientX - b.px, e.clientY - b.py) < b.r + 8);
+    if (hit === rad.sub) { rad.hov = hit; radTargets(); radRun(hit); return; }
+    // first tap on trim pops it out with playback above it; second tap opens trim
+    if (hit === rad.par && !rad.armed) { rad.armed = true; rad.hov = hit; rad.fx = rad.par.px; rad.fy = rad.par.py; radTargets(); return; }
     if (hit) { rad.hov = hit; rad.fx = rad.x + Math.cos(hit.ang) * RAD_OUT; rad.fy = rad.y + Math.sin(hit.ang) * RAD_OUT; radTargets(); radRun(hit); }
     else closeRadial();
   });
@@ -2072,7 +2091,13 @@ function radPick(fx, fy) {
 function radMove(fx, fy) {
   if (!rad || rad.closing) return;
   rad.fx = fx; rad.fy = fy;
-  const h = radPick(fx, fy);
+  let h = radPick(fx, fy);
+  if (rad.hov === rad.par || rad.hov === rad.sub) {
+    // from the pulled-out trim bubble, going up reaches playback
+    const A = rad.sub.anchor, along = (fy - A.y) * rad.sub.up, side = Math.abs(fx - A.x);
+    if (along > 26 && side < 70 + along * .4) h = rad.sub;
+    else if (Math.hypot(fx - A.x, fy - A.y) < 60) h = rad.par;
+  }
   if (h !== rad.hov) { rad.hov = h; if (h && navigator.vibrate) try { navigator.vibrate(4); } catch (err) {} }
   radTargets();
 }
@@ -2084,7 +2109,9 @@ function radTargets() {
   for (const b of bubs) {
     const cos = Math.cos(b.ang), sin = Math.sin(b.ang);
     if (rad.closing) { b.tx = x; b.ty = y; b.tr = 0; continue; }
-    if (b === hov) {
+    if (b === rad.par && (hov === rad.sub || (rad.armed && hov !== b))) {
+      b.tx = rad.sub.anchor.x; b.ty = rad.sub.anchor.y; b.tr = RAD_BR;
+    } else if (b === hov) {
       // follows the finger out along its direction, then snaps free
       const along = Math.min(Math.max(fd, RAD_REST), RAD_OUT + 30);
       const out = along < RAD_REST + 20 ? along : RAD_OUT + (along - RAD_OUT) * .35;
@@ -2098,6 +2125,12 @@ function radTargets() {
     }
     b.c.setAttribute('fill', b === hov ? 'rgb(6,6,8)' : 'rgb(30,30,34)');
   }
+  const sb = rad.sub, open = !rad.closing && (hov === rad.par || hov === sb || rad.armed);
+  if (!open) { sb.tx = rad.par.tx; sb.ty = rad.par.ty; sb.tr = 0; }
+  else if (hov === sb) {
+    sb.tx = sb.home.x + (fx - sb.home.x) * .2; sb.ty = sb.home.y + (fy - sb.home.y) * .2; sb.tr = RAD_BR * 1.14;
+  } else { sb.tx = sb.home.x; sb.ty = sb.home.y; sb.tr = RAD_BR * .9; }
+  sb.c.setAttribute('fill', hov === sb ? 'rgb(6,6,8)' : 'rgb(30,30,34)');
 }
 
 function radLoop() {
@@ -2107,14 +2140,14 @@ function radLoop() {
     const ck = r.closing ? 0 : (r.hov ? 24 : 27);
     r.coreR += (ck - r.coreR) * .25;
     r.core.setAttribute('r', Math.max(0, r.coreR));
-    for (const b of r.bubs) {
+    for (const b of r.all) {
       b.vx = (b.vx + (b.tx - b.px) * .2) * .7;
       b.vy = (b.vy + (b.ty - b.py) * .2) * .7;
       b.vr = (b.vr + (b.tr - b.r) * .22) * .66;
       b.px += b.vx; b.py += b.vy; b.r += b.vr;
       if (Math.abs(b.vx) + Math.abs(b.vy) + Math.abs(b.vr) > .05) moving = true;
       b.c.setAttribute('cx', b.px); b.c.setAttribute('cy', b.py); b.c.setAttribute('r', Math.max(0, b.r));
-      const s = Math.max(0, b.r / RAD_BR);
+      const s = Math.max(0, Math.min(1.3, b.r / RAD_BR));
       b.ic.style.transform = `translate(${b.px}px, ${b.py}px) scale(${s})`;
       b.ic.style.opacity = Math.min(1, s * 1.2);
     }
@@ -2142,6 +2175,7 @@ function radRun(b) {
     if (b.k === 'audio') { if (lockWin === o) unlock(); else setLock(o); }
     else if (b.k === 'crop') openCrop(o.it);
     else if (b.k === 'trim') openTrim(o.it);
+    else if (b.k === 'play') openPlayback(o.it);
   }, 140);
 }
 
@@ -2152,7 +2186,7 @@ function closeRadial(now) {
   if (!r.o.closed) r.o.el.style.zIndex = r.o.z;
   r.dim.classList.remove('on');
   r.lay.style.pointerEvents = 'none';
-  for (const b of r.bubs) { b.tx = r.x; b.ty = r.y; b.tr = 0; }
+  for (const b of r.all) { b.tx = r.x; b.ty = r.y; b.tr = 0; }
   const kill = () => { cancelAnimationFrame(r.raf); r.lay.remove(); r.dim.remove(); };
   if (now) kill(); else setTimeout(kill, 380);
 }
@@ -2168,6 +2202,7 @@ function saveItemMeta(it, key, val) {
     o.it[key] = val;
     if (key === 'crop') applyCrop(o, true);
     if (key === 'trim' && val) try { o.v.currentTime = val.start; } catch (err) {}
+    if (key === 'mode' || (o.it.mode && key === 'trim')) applyMode(o);
   }
 }
 
@@ -2359,6 +2394,161 @@ function analyzeEnds(src, dur) {
   })();
   sugCache.set(src, job);
   return job;
+}
+
+
+/* ================= playback modes (boomerang & friends) ================= */
+// Buffered modes record one forward pass of the clip (trim range, capped) into small frames, then play them back and forth.
+const FX = {
+  'boomerang':        { buf: true, L: 2.2, fwd: 1,  back: 1 },
+  'slo-mo boomerang': { buf: true, L: 1.6, fwd: .5, back: .5 },
+  'duo':              { buf: true, L: 2.2, fwd: 1,  back: 3 },
+  'reverse':          { buf: true, L: 3.5, fwd: 0,  back: 1 },
+  'echo':             { trail: 'echo' },
+  'long exposure':    { trail: 'exposure' },
+  'slo-mo':           { rate: .5 },
+  'fast':             { rate: 2 },
+  'live':             { trail: 'live' }     // plain copy (editor preview of normal/speed modes)
+};
+const PLAY_MODES = ['normal', 'boomerang', 'slo-mo boomerang', 'duo', 'echo', 'long exposure', 'slo-mo', 'fast', 'reverse'];
+const fxPreviews = new Set();
+let fxRaf = 0;
+
+function applyMode(o) {
+  const m = o.it.mode, d = m && FX[m];
+  o.v.playbackRate = (d && d.rate) || 1;
+  if (!d || d.rate) {
+    if (o.fx) { o.fx.cv.remove(); o.fx = null; o.el.classList.remove('fx'); }
+    return;
+  }
+  if (!o.fx) {
+    const cv = document.createElement('canvas'); cv.className = 'fxc';
+    o.v.after(cv);
+    o.fx = { cv, ctx: cv.getContext('2d') };
+    o.el.classList.add('fx');
+  }
+  const f = o.fx;
+  Object.assign(f, { mode: m, d, frames: [], lastCt: -1, lastNow: 0, dir: -1, capturing: !!d.buf });
+  f.ctx.clearRect(0, 0, f.cv.width, f.cv.height);
+  if (d.buf) {
+    const tr = o.it.trim, s = tr ? tr.start : 0, e = tr ? tr.end : (o.v.duration || 1e9);
+    f.s = s; f.L = Math.max(.3, Math.min(d.L, e - s));
+    try { o.v.currentTime = s; } catch (err) {}
+  }
+  if (!fxRaf) fxRaf = requestAnimationFrame(fxTick);
+}
+
+function fxTick(now) {
+  fxRaf = 0;
+  let any = false;
+  for (const o of [...wins, ...fxPreviews]) {
+    if (!o.fx || o.closed) continue;
+    any = true;
+    try { fxFrame(o, now); } catch (err) {}
+  }
+  if (any) fxRaf = requestAnimationFrame(fxTick);
+}
+
+function fxFrame(o, now) {
+  const f = o.fx, v = o.v, d = f.d, ctx = f.ctx;
+  if (!v.videoWidth) return;
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  const W = Math.round(o.el.clientWidth * dpr), H = Math.round(o.el.clientHeight * dpr);
+  if (!W || !H) return;
+  if (f.cv.width !== W || f.cv.height !== H) { f.cv.width = W; f.cv.height = H; }
+  const c = o.it.crop || { x: 0, y: 0, w: 1, h: 1 };
+  const draw = (src, sw, sh) => ctx.drawImage(src, c.x * sw, c.y * sh, c.w * sw, c.h * sh, 0, 0, W, H);
+  const dt = f.lastNow ? Math.min(.1, (now - f.lastNow) / 1000) : 0; f.lastNow = now;
+  const ct = v.currentTime, fresh = ct !== f.lastCt;
+  // editor previews loop their trim range themselves
+  if (o.preview && o.it.trim && (ct >= o.it.trim.end - .04 || ct < o.it.trim.start - .3)) try { v.currentTime = o.it.trim.start; } catch (err) {}
+
+  if (d.buf) {
+    if (f.capturing) {
+      const lastT = f.frames.length ? f.frames[f.frames.length - 1].t : -1;
+      if (fresh && ct >= f.s - .03 && ct <= f.s + f.L && (ct - lastT >= .031 || ct < lastT)) {
+        const sc = Math.min(1, 480 / Math.max(v.videoWidth, v.videoHeight));
+        const fc = document.createElement('canvas');
+        fc.width = Math.round(v.videoWidth * sc); fc.height = Math.round(v.videoHeight * sc);
+        fc.getContext('2d').drawImage(v, 0, 0, fc.width, fc.height);
+        f.frames.push({ t: ct, c: fc });
+      }
+      const wrapped = fresh && f.lastCt >= 0 && ct < f.lastCt - .05;
+      if (f.frames.length > 4 && (ct > f.s + f.L || wrapped)) {
+        f.capturing = false;
+        f.frames.sort((a, b) => a.t - b.t);
+        f.t0 = f.frames[0].t; f.t1 = f.frames[f.frames.length - 1].t;
+        f.p = f.t1; f.dir = -1;
+      }
+      f.lastCt = ct;
+      ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+      draw(v, v.videoWidth, v.videoHeight);
+      return;
+    }
+    if (f.dir > 0) { f.p += dt * d.fwd; if (f.p >= f.t1) { f.p = f.t1; f.dir = -1; } }
+    else { f.p -= dt * d.back; if (f.p <= f.t0) { if (d.fwd) { f.p = f.t0; f.dir = 1; } else f.p = f.t1; } }
+    const fr = f.frames, n = fr.length;
+    let i = Math.round((f.p - f.t0) / (f.t1 - f.t0 || 1) * (n - 1));
+    i = Math.max(0, Math.min(n - 1, i));
+    while (i < n - 1 && fr[i + 1].t <= f.p) i++;
+    while (i > 0 && fr[i].t > f.p) i--;
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    draw(fr[i].c, fr[i].c.width, fr[i].c.height);
+    return;
+  }
+
+  // trail modes draw the live video over what's already there
+  if (!fresh) return;
+  f.lastCt = ct;
+  if (d.trail === 'live') {
+    ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1; draw(v, v.videoWidth, v.videoHeight);
+  } else if (d.trail === 'echo') {
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = .28; draw(v, v.videoWidth, v.videoHeight);
+  } else {
+    // long exposure: light stays, dark slowly fades
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = .07; ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'lighten';
+    ctx.globalAlpha = 1; draw(v, v.videoWidth, v.videoHeight);
+    ctx.globalCompositeOperation = 'source-over';
+  }
+}
+
+function openPlayback(it) {
+  let mode = it.mode || 'normal';
+  const S = edShell(it, () => saveItemMeta(it, 'mode', mode === 'normal' ? null : mode));
+  const box = document.createElement('div'); box.className = 'ed-box clip';
+  box.append(S.v); S.stage.append(box);
+  // preview shows the crop too
+  const pv = { v: S.v, el: box, preview: true, it: { crop: it.crop, trim: it.trim, mode: null } };
+  const fit = () => {
+    const vw = S.v.videoWidth || 16, vh = S.v.videoHeight || 9, c = it.crop || { w: 1, h: 1 };
+    const va = (vw * c.w) / (vh * c.h);
+    const mw = innerWidth * .72, mh = S.stage.clientHeight * .8;
+    const bw = Math.min(mw, mh * va);
+    box.style.width = bw + 'px'; box.style.height = bw / va + 'px';
+  };
+  const set = (m, el) => {
+    mode = m;
+    chips.forEach(ch => ch.classList.toggle('sel', ch === el));
+    if (!S.v.videoWidth) return;
+    // the preview always draws through the canvas so the crop shows
+    pv.it.mode = (m === 'normal' || FX[m].rate) ? 'live' : m;
+    applyMode(pv);
+    S.v.playbackRate = (FX[m] && FX[m].rate) || 1;
+    fxPreviews.add(pv);
+  };
+  const chips = PLAY_MODES.map(m => {
+    const el = S.tool(m, () => set(m, el));
+    if (m === mode) el.classList.add('sel');
+    return el;
+  });
+  S.tools.classList.add('modes');
+  S.v.addEventListener('loadedmetadata', () => { fit(); set(mode, chips[PLAY_MODES.indexOf(mode)]); });
+  requestAnimationFrame(fit);
+  addEventListener('resize', fit);
+  const iv = setInterval(() => { if (!S.ed.isConnected) { fxPreviews.delete(pv); clearInterval(iv); } }, 300);
 }
 
 const fmtT = t => { t = Math.max(0, t); const m = Math.floor(t / 60), s = t - m * 60; return m + ':' + (s < 10 ? '0' : '') + s.toFixed(1); };
