@@ -280,9 +280,10 @@
   .ri { position: absolute; left: 0; top: 0; width: 24px; height: 24px; margin: -12px 0 0 -12px; pointer-events: none; }
   .ri svg { width: 24px; height: 24px; fill: none; stroke: #fff; stroke-width: 1.2; stroke-linecap: round; stroke-linejoin: round; transition: stroke .15s; }
   .ri.on svg { stroke: #ff8fc6; }
+  .ri svg .tx { fill: #fff; stroke: none; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-weight: 300; font-size: 14.5px; letter-spacing: .2px; }
 
   /* ---- crop / trim editors ---- */
-  .ed { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; height: 100lvh; z-index: 200000; color: #fff; font-weight: 300;
+  .ed { position: fixed; inset: 0; z-index: 200000; color: #fff; font-weight: 300;
         background: rgba(0,0,0,.66); -webkit-backdrop-filter: blur(26px) saturate(1.6); backdrop-filter: blur(26px) saturate(1.6);
         display: flex; flex-direction: column; align-items: center; opacity: 0; transition: opacity .2s ease; touch-action: none; }
   .ed.on { opacity: 1; }
@@ -337,7 +338,7 @@
   .win { mix-blend-mode: var(--ub, normal); border-radius: var(--ur, 0); }
   .ed.uni { align-items: stretch; }
   .ed.uni .ed-foot { justify-content: center; }
-  .uni-head { display: flex; align-items: center; gap: 22px; padding: 34px max(28px, calc(50vw - 300px)) 10px; }
+  .uni-head { display: flex; align-items: center; gap: 22px; padding: calc(30px + env(safe-area-inset-top)) max(28px, calc(50% - 300px)) 10px; }
   .uni-prev { position: relative; overflow: hidden; flex: none; width: 150px; height: 84px; background: #000;
               box-shadow: 0 0 0 .5px rgba(255,255,255,.35); transition: width .3s ease, height .3s ease, border-radius .3s ease; }
   .uni-prev video { position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: fill; }
@@ -345,7 +346,7 @@
   .uni-ttl { font-size: 22px; font-weight: 200; color: rgba(255,255,255,.55); }
   .uni-ttl b { font-weight: 200; color: #fff; }
   .uni-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; touch-action: pan-y; overscroll-behavior: contain;
-              padding: 6px max(28px, calc(50vw - 300px)) 30px; }
+              padding: 6px max(28px, calc(50% - 300px)) 30px; }
   .uni-sec { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: rgba(255,255,255,.38); padding: 26px 0 8px;
              border-bottom: .5px solid rgba(255,255,255,.14); }
   .uni-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; min-height: 52px; padding: 6px 0;
@@ -404,7 +405,7 @@
   @keyframes haloSpin { to { transform: translate(-50%, -50%) rotate(360deg); } }
   .tl-chip { background: linear-gradient(112deg, rgba(255,80,140,.10), rgba(255,220,80,.07), rgba(80,220,255,.10)), rgba(255,255,255,.06); }
   /* ---- video manager ---- */
-  .vm-head { padding: 34px max(28px, calc(50vw - 300px)) 8px; }
+  .vm-head { padding: calc(30px + env(safe-area-inset-top)) max(28px, calc(50% - 300px)) 8px; }
   .vm-store { font-size: 13px; color: rgba(255,255,255,.55); padding-top: 8px; }
   .vm-keep { font-size: 12px; color: rgba(255,255,255,.4); padding-top: 5px; }
   .vm-keep u { color: #2ee6d2; text-decoration: none; cursor: pointer; }
@@ -2061,7 +2062,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-17-110635';
+const BUILD = '2026-11-17-111459';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
@@ -2112,7 +2113,7 @@ const ICONS = {
   crop:   '<path d="M7 3v14h14"/><path d="M3 7h14v14"/>',
   trim:   '<circle cx="6.5" cy="6.5" r="2.6"/><circle cx="6.5" cy="17.5" r="2.6"/><path d="M8.6 8.1 20 17"/><path d="M8.6 15.9 20 7"/>',
   play:   '<path d="M8.5 6.2v11.6L18 12z"/>',
-  rename: '<path d="M2.5 18 7 5.5 11.5 18"/><path d="M4.2 13.6h5.6"/><path d="M19.8 11.2v6.8"/><circle cx="16.9" cy="15.1" r="2.9"/>',
+  rename: '<text x="12" y="17" text-anchor="middle" class="tx">Aa</text>',
   planet: '<ellipse cx="12" cy="12" rx="10.3" ry="3.3" transform="rotate(-20 12 12)"/><circle cx="12" cy="12" r="5.4" fill="#1e1e22"/><path d="M1.7 12a10.3 3.3 0 0 0 20.6 0" transform="rotate(-20 12 12)"/>',
   camera: '<path d="M3 8.2a1.8 1.8 0 0 1 1.8-1.8h2.3L8.6 4.5h6.8l1.5 1.9h2.3A1.8 1.8 0 0 1 21 8.2v9.3a1.8 1.8 0 0 1-1.8 1.8H4.8A1.8 1.8 0 0 1 3 17.5z"/><circle cx="12" cy="12.6" r="3.6"/>',
   files:  '<path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/><path d="M3.5 10.5h17"/>'
@@ -2121,7 +2122,7 @@ const ICONS = {
 const WIN_MENU = { turn: 'rotate', items: [{ k: 'audio', a: -90 }, { k: 'crop', a: 150 }, { k: 'trim', a: 30 }],
                    subs: [{ k: 'play', parent: 'trim', a: -90 }] };
 // hold a title: a Y. rename up-left, universal (planet) up-right with videos + databases branching off it
-const TITLE_MENU = { turn: 'flip', stem: true, items: [{ k: 'rename', a: -132 }, { k: 'planet', a: -48 }],
+const TITLE_MENU = { turn: 'flip', stem: 78, items: [{ k: 'rename', a: -132 }, { k: 'planet', a: -48 }],
                      subs: [{ k: 'camera', parent: 'planet', a: -68 }, { k: 'files', parent: 'planet', a: 18 }] };
 const SUB_D = 72;
 // resting: bubbles fused into one blob; the one you drag toward stretches out and splits off
@@ -2152,13 +2153,13 @@ function openRadial(menu, x, y, pid, opts) {
     ? [[1, 1, 0], [1, -1, 0], [-1, 1, 0], [-1, -1, 0]]
     : [0, 180, 90, -90, 45, -45, 135, -135].map(r => [1, 1, r]);
   const tf = (aDeg, t) => { const a = (aDeg + t[2]) * deg; return Math.atan2(Math.sin(a) * t[1], Math.cos(a) * t[0]); };
+  // with a stem, the finger sits at the stem's tip and the hub is up the stem from it
+  const hubFor = t => { if (!menu.stem) return [x, y]; const a = tf(90, t); return [x - Math.cos(a) * menu.stem, y - Math.sin(a) * menu.stem]; };
+  const fx0 = x, fy0 = y;
   const spots = t => {
-    const out = [];
+    const out = [], [x, y] = hubFor(t);
     for (const b of menu.items) { const a = tf(b.a, t); out.push([x + Math.cos(a) * (RAD_OUT + 30), y + Math.sin(a) * (RAD_OUT + 30)]); }
-    for (const s of menu.subs) {
-      const pa = tf(menu.items.find(b => b.k === s.parent).a, t), sa = tf(s.a, t);
-      out.push([x + Math.cos(pa) * RAD_OUT + Math.cos(sa) * (SUB_D + 30), y + Math.sin(pa) * RAD_OUT + Math.sin(sa) * (SUB_D + 30)]);
-    }
+    // branches don't decide placement; they flip sides themselves if they'd leave the screen
     return out;
   };
   // pick the turn that needs the least sliding, then slide the hub so every bubble is on screen
@@ -2173,7 +2174,8 @@ function openRadial(menu, x, y, pid, opts) {
   let T = turns[0], best = Infinity, sh = [0, 0];
   // upright is the real shape: only flip/turn when sliding would be a long way
   turns.forEach((t, i) => { const d = shiftFor(t), m = Math.hypot(d[0], d[1]) + (i ? 140 : 0); if (m < best - 1) { best = m; T = t; sh = d; } });
-  const ox = x, oy = y;     // where the finger went down; choices are read from here
+  const ox = fx0, oy = fy0;     // where the finger went down
+  [x, y] = hubFor(T);
   x += sh[0]; y += sh[1];
 
   const lay = document.createElement('div'); lay.className = 'rlay';
@@ -2194,21 +2196,27 @@ function openRadial(menu, x, y, pid, opts) {
     const par = bubs.find(b => b.k === s.parent);
     const sb = mkB(s, tf(s.a, T)); sb.r = 0; sb.tr = 0; sb.par = par;
     const P = { x: x + Math.cos(par.ang) * RAD_OUT, y: y + Math.sin(par.ang) * RAD_OUT };
+    const inside = a => { const hx = P.x + Math.cos(a) * SUB_D, hy = P.y + Math.sin(a) * SUB_D;
+      return hx > 40 && hx < innerWidth - 40 && hy > 40 && hy < innerHeight - 40; };
+    for (const a of [sb.ang, -sb.ang, Math.PI - sb.ang, sb.ang + Math.PI]) if (inside(a)) { sb.ang = a; break; }
+    // two branches mustn't land on the same spot after flipping
+    const twin = (par.kids || []).find(k => Math.abs(Math.atan2(Math.sin(k.ang - sb.ang), Math.cos(k.ang - sb.ang))) < .6);
+    if (twin) sb.ang = twin.ang + (sb.ang > twin.ang ? 1 : -1) * 1.3;
     sb.anchor = P; sb.home = { x: P.x + Math.cos(sb.ang) * SUB_D, y: P.y + Math.sin(sb.ang) * SUB_D };
     par.kids = (par.kids || []).concat(sb);
     return sb;
   });
   // the Y's stem: a short tail below the hub, part of the shape but not a choice
-  let stem = null;
+  const stems = [];
   if (menu.stem) {
     const a = tf(90, T);
-    stem = { c: circ(), ic: { style: {} }, ang: a, px: x, py: y, vx: 0, vy: 0, r: 2, vr: 0,
-             tx: x + Math.cos(a) * 34, ty: y + Math.sin(a) * 34, tr: 17, deco: true };
+    for (const [f, r] of [[.42, 17], [.78, 14], [1, 12]])
+      stems.push({ c: circ(), ang: a, f, rr: r, px: x, py: y, vx: 0, vy: 0, r: 2, vr: 0, tx: x, ty: y, tr: r, deco: true });
   }
   if (opts.onBubble) for (const b of [...bubs, ...subs]) opts.onBubble(b);
   document.body.append(lay);
-  rad = { menu, o: opts.o || null, run: opts.run, own: !!opts.ownPointer, x, y, ox, oy, pid, lay, bubs, subs, stem,
-          all: [...bubs, ...subs, ...(stem ? [stem] : [])], armed: null, core, coreR: 4,
+  rad = { menu, o: opts.o || null, run: opts.run, own: !!opts.ownPointer, x, y, ox, oy, pid, lay, bubs, subs, stems,
+          all: [...bubs, ...subs, ...stems], armed: null, core, coreR: 4,
           hov: null, dragging: true, fx: x, fy: y, closing: false, raf: 0, onClose: opts.onClose };
   radTargets();
   radLoop();
@@ -2373,10 +2381,10 @@ function radTargets() {
     else { s.tx = s.home.x; s.ty = s.home.y; s.tr = RAD_BR * .9; }
     s.c.setAttribute('fill', hov === s ? 'rgb(6,6,8)' : 'rgb(30,30,34)');
   }
-  if (rad.stem) {
-    const st = rad.stem;
-    if (rad.closing) { st.tx = x; st.ty = y; st.tr = 0; }
-    else { st.tx = x + Math.cos(st.ang) * 34; st.ty = y + Math.sin(st.ang) * 34; st.tr = hov ? 14 : 17; }
+  for (const st of rad.stems) {
+    if (rad.closing) { st.tx = rad.ox; st.ty = rad.oy; st.tr = 0; continue; }
+    // beads run from the hub down to where the finger touched
+    st.tx = x + (rad.ox - x) * st.f; st.ty = y + (rad.oy - y) * st.f; st.tr = hov ? st.rr * .85 : st.rr;
   }
 }
 
