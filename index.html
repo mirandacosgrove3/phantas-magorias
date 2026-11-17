@@ -2069,7 +2069,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-17-111719';
+const BUILD = '2026-11-17-112037';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
@@ -2287,7 +2287,7 @@ function openWinRadial(o, x, y, pid) {
     onBubble: b => { if (b.k === 'audio' && lockWin === o) b.ic.classList.add('on'); },
     run: k => {
       if (o.closed) return;
-      if (k !== 'audio') dropFocus();
+      dropFocus();     // choosing anything ends the focus; only letting go without a choice keeps it
       if (k === 'audio') { if (lockWin === o) unlock(); else setLock(o); }
       else if (k === 'crop') openCrop(o.it);
       else if (k === 'trim') openTrim(o.it);
