@@ -2087,7 +2087,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-17-113444';
+const BUILD = '2026-11-17-114212';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
@@ -2496,14 +2496,22 @@ function applyCrop(o, animate) {
   }
 }
 
-// keep trimmed windows looping inside their range
-setInterval(() => {
+// keep trimmed windows looping inside their range: checked every frame, exactly one jump per loop
+const CUT_PAD = .12;      // auto-cuts land a few frames early so no part of an end card ever shows
+function trimTick(now) {
   for (const o of wins) {
     const t = o.et; if (!t || o.closed) continue;
-    const ct = o.v.currentTime;
-    if (ct >= t.end - 0.04 || ct < t.start - 0.3) try { o.v.currentTime = t.start; } catch (err) {}
+    const v = o.v;
+    // never stack jumps: wait for the last one to land, and give it a moment to settle
+    if (v.seeking || v.readyState < 2 || now - (o.loopAt || 0) < 350) continue;
+    const ct = v.currentTime, dur = v.duration || Infinity;
+    const lead = .03 * (v.playbackRate || 1);            // about one frame ahead
+    const pastEnd = t.end < dur - .06 && ct >= t.end - lead;
+    if (pastEnd || ct < t.start - .25) { o.loopAt = now; try { v.currentTime = t.start; } catch (err) {} }
   }
-}, 80);
+  requestAnimationFrame(trimTick);
+}
+requestAnimationFrame(trimTick);
 
 function edShell(it, onOk, onReset) {
   closeRadial(true); dropFocus();
@@ -2902,7 +2910,8 @@ async function scanAll() {
       const u2 = uni(); if (!(u2.autoEnd || u2.autoStart)) break;
       await scanItem(it.name, it.src);
       for (const o of wins) if (o.it.name === it.name && !o.closed) { computeTrim(o); applyMode(o); }
-      await new Promise(r => setTimeout(r, 120));
+      await new Promise(r => setTimeout(r, 600));
+      while (document.hidden) await new Promise(r => setTimeout(r, 1000));
     }
   } finally { scanning = false; }
 }
@@ -2917,8 +2926,8 @@ function computeTrim(o) {
   }
 
   if (Array.isArray(o.auto)) for (const sg of o.auto) {
-    if (sg.side === 'end' && u.autoEnd) e = Math.min(e, sg.at);
-    if (sg.side === 'start' && u.autoStart) s = Math.max(s, sg.at);
+    if (sg.side === 'end' && u.autoEnd) e = Math.min(e, sg.at - CUT_PAD);
+    if (sg.side === 'start' && u.autoStart) s = Math.max(s, sg.at + .04);
   }
   if (u.maxLen) e = Math.min(e, s + u.maxLen);
   const full = s < .05 && e > dur - .05;
@@ -3324,7 +3333,7 @@ function openTrim(it) {
         chip.addEventListener('pointerdown', e => e.stopPropagation());
         chip.addEventListener('click', e => {
           e.stopPropagation();
-          if (sg.side === 'end') t.end = Math.max(sg.at, t.start + .2); else t.start = Math.min(sg.at, t.end - .2);
+          if (sg.side === 'end') t.end = Math.max(sg.at - CUT_PAD, t.start + .2); else t.start = Math.min(sg.at + .04, t.end - .2);
           seek(t.start); draw();
         });
         tl.insertBefore(reg, tl.querySelector('.tl-h'));
