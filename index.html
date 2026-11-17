@@ -273,7 +273,7 @@
   .rdim { position: fixed; inset: 0; z-index: 150000; pointer-events: none;
           background: rgba(0,0,0,0); -webkit-backdrop-filter: blur(0) saturate(1); backdrop-filter: blur(0) saturate(1);
           transition: background .35s ease, backdrop-filter .45s cubic-bezier(.2,.8,.2,1), -webkit-backdrop-filter .45s cubic-bezier(.2,.8,.2,1); }
-  .rdim.on { background: rgba(0,0,0,.38); -webkit-backdrop-filter: blur(16px) saturate(1.7) brightness(.85); backdrop-filter: blur(16px) saturate(1.7) brightness(.85); }
+  .rdim.on { background: rgba(0,0,0,.42); -webkit-backdrop-filter: blur(3px) saturate(1.15) brightness(.8); backdrop-filter: blur(3px) saturate(1.15) brightness(.8); }
   .rlay { position: fixed; inset: 0; z-index: 150002; touch-action: none; }
   .rlay svg.goo { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
   .ri { position: absolute; left: 0; top: 0; width: 24px; height: 24px; margin: -12px 0 0 -12px; pointer-events: none; }
@@ -331,6 +331,77 @@
   .fxc { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
   .win.fx video, .ed-box.fx video { opacity: 0; }
   .ed-tools.modes { flex-wrap: wrap; justify-content: center; max-width: 92vw; }
+  /* ---- universal adjustments ---- */
+  .win video, .win .fxc { filter: var(--uf, none); }
+  .win { mix-blend-mode: var(--ub, normal); border-radius: var(--ur, 0); }
+  .ed.uni { align-items: stretch; }
+  .ed.uni .ed-foot { justify-content: center; }
+  .uni-head { display: flex; align-items: center; gap: 22px; padding: 34px max(28px, calc(50vw - 300px)) 10px; }
+  .uni-prev { position: relative; overflow: hidden; flex: none; width: 150px; height: 84px; background: #000;
+              box-shadow: 0 0 0 .5px rgba(255,255,255,.35); transition: width .3s ease, height .3s ease, border-radius .3s ease; }
+  .uni-prev video { position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: fill; }
+  .uni-prev.empty { opacity: .3; }
+  .uni-ttl { font-size: 22px; font-weight: 200; color: rgba(255,255,255,.55); }
+  .uni-ttl b { font-weight: 200; color: #fff; }
+  .uni-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; touch-action: pan-y; overscroll-behavior: contain;
+              padding: 6px max(28px, calc(50vw - 300px)) 30px; }
+  .uni-sec { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: rgba(255,255,255,.38); padding: 26px 0 8px;
+             border-bottom: .5px solid rgba(255,255,255,.14); }
+  .uni-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; min-height: 52px; padding: 6px 0;
+             border-bottom: .5px solid rgba(255,255,255,.07); }
+  .uni-lab { font-size: 15px; flex: none; max-width: 40%; }
+  .uni-lab small { display: block; font-size: 11.5px; color: rgba(255,255,255,.38); padding-top: 3px; }
+  .uni-tog { position: relative; width: 46px; height: 26px; border-radius: 13px; flex: none; cursor: pointer;
+             box-shadow: inset 0 0 0 .5px rgba(255,255,255,.45); transition: background .25s, box-shadow .25s; }
+  .uni-tog::after { content: ""; position: absolute; left: 3px; top: 3px; width: 20px; height: 20px; border-radius: 50%;
+                    background: rgba(255,255,255,.75); transition: transform .35s cubic-bezier(.3,1.5,.45,1), background .25s; }
+  .uni-tog.on { background: rgba(255,111,181,.22); box-shadow: inset 0 0 0 .5px #ff6fb5; }
+  .uni-tog.on::after { transform: translateX(20px); background: #ff6fb5; }
+  .uni-chips { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 2px 4px; }
+  .uni-chips span { font-size: 13.5px; color: rgba(255,255,255,.5); padding: 7px 8px; cursor: pointer; white-space: nowrap; }
+  .uni-chips span.sel { color: #ff6fb5; }
+  .uni-sl { display: flex; align-items: center; gap: 12px; flex: 1; max-width: 340px; }
+  .uni-sl span { width: 44px; text-align: right; font-size: 13px; color: rgba(255,255,255,.6); font-variant-numeric: tabular-nums; }
+  .uni-sl input { flex: 1; -webkit-appearance: none; appearance: none; height: 28px; background: transparent; margin: 0; }
+  .uni-sl input::-webkit-slider-runnable-track { height: 1px; background: rgba(255,255,255,.35); }
+  .uni-sl input::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; margin-top: -8.5px; border-radius: 50%;
+                                        background: #000; box-shadow: inset 0 0 0 1px #ff6fb5; }
+  .uni-sl input::-moz-range-track { height: 1px; background: rgba(255,255,255,.35); }
+  .uni-sl input::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: #000; border: 1px solid #ff6fb5; }
+  .uni-reset { text-align: center; font-size: 13.5px; color: rgba(255,255,255,.45); padding: 26px 0 6px; cursor: pointer; }
+  /* ---- prism texture on glass: soft spectrum bands drifting, plus fine rainbow grain ---- */
+  .ed::before, .rdim::before, .ed::after, .rdim::after {
+    content: ""; position: absolute; inset: -300px; pointer-events: none; z-index: -1; mix-blend-mode: screen;
+  }
+  .ed::before, .rdim::before {
+    background: repeating-linear-gradient(112deg,
+      transparent 0px, rgba(255,40,90,.30) 18px, rgba(255,160,40,.30) 32px, rgba(235,255,70,.26) 46px,
+      rgba(60,255,150,.26) 60px, rgba(40,190,255,.30) 74px, rgba(140,80,255,.30) 88px, transparent 108px, transparent 300px);
+    filter: blur(14px); opacity: .32; animation: prismdrift 26s linear infinite;
+  }
+  .ed::after, .rdim::after {
+    background: repeating-linear-gradient(112deg,
+      rgba(255,60,120,.07) 0 1px, transparent 1px 3px, rgba(80,220,255,.07) 3px 4px, transparent 4px 6px, rgba(255,230,90,.06) 6px 7px, transparent 7px 9px);
+    opacity: .9;
+  }
+  @keyframes prismdrift { to { transform: translate3d(278px, 112px, 0); } }   /* one 300px period along 112deg */
+  .ed > * { position: relative; }
+  .ed > .ed-stage { z-index: 1; }
+
+  /* hold menu: prism only near the held video, fading out around it */
+  .rdim::before, .rdim::after {
+    -webkit-mask-image: radial-gradient(circle var(--pr, 300px) at calc(var(--px, 50vw) + 300px) calc(var(--py, 50vh) + 300px), #000 0%, rgba(0,0,0,.5) 55%, transparent 100%);
+            mask-image: radial-gradient(circle var(--pr, 300px) at calc(var(--px, 50vw) + 300px) calc(var(--py, 50vh) + 300px), #000 0%, rgba(0,0,0,.5) 55%, transparent 100%);
+  }
+  .rdim::before { opacity: .55; }
+  .rhalo { position: fixed; z-index: 150000; pointer-events: none; overflow: hidden; border-radius: calc(var(--ur, 0px) + 16px);
+           filter: blur(14px); opacity: 0; transition: opacity .35s ease; mix-blend-mode: screen; }
+  .rhalo.on { opacity: .75; }
+  .rhalo i { position: absolute; left: 50%; top: 50%; width: 200%; aspect-ratio: 1; transform: translate(-50%, -50%);
+             background: conic-gradient(#ff3d6e, #ffa23d, #f2ff4d, #45ff9a, #36c8ff, #8a5cff, #ff4fd8, #ff3d6e);
+             animation: haloSpin 7s linear infinite; }
+  @keyframes haloSpin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+  .tl-chip { background: linear-gradient(112deg, rgba(255,80,140,.10), rgba(255,220,80,.07), rgba(80,220,255,.10)), rgba(255,255,255,.06); }
 </style>
 </head>
 <body>
@@ -657,7 +728,7 @@ function setActive(o) {
 }
 
 /* ================= windows ================= */
-function front(o) { o.el.style.zIndex = ++z; o.z = z; setActive(o); }
+function front(o) { o.z = ++z; o.el.style.zIndex = focus && focus.o === o ? 150001 : o.z; setActive(o); }
 
 function closeWin(o) {
   if (lockWin === o) unlock();
@@ -714,8 +785,8 @@ function openWin(it, x, y) {
   v.addEventListener('loadedmetadata', () => {
     if (!v.videoWidth) return;
     applyCrop(o, false);
-    if (o.it.trim) try { v.currentTime = o.it.trim.start; } catch (err) {}
-    if (o.it.mode) applyMode(o);
+    computeTrim(o);
+    applyMode(o);
     if (o.adjusted) { o.h = o.w / o.aspect; apply(o, false); }
     else relayout(o);
   });
@@ -1094,6 +1165,7 @@ function switchDb(id) {
   resetAll();                                 // close any open videos from the old list
   dbState.current = id; saveDbs();
   items = itemsFromDb();
+  applyLook();
   render();
 }
 function createDb(name) {
@@ -1573,7 +1645,12 @@ function buildKb() {
   files.addEventListener('pointerdown', e => { e.stopPropagation(); files.classList.add('down'); });
   files.addEventListener('pointerup', () => files.classList.remove('down'));
   files.addEventListener('click', e => { e.stopPropagation(); toggleDbPanel(); });   // a real click so the name field can raise the keyboard
-  bar.append(cancel, add, files, kbd, enter);
+  const saturn = document.createElement('div'); saturn.className = 'ctl kbd saturn';
+  saturn.innerHTML = '<svg viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="10.3" ry="3.3" transform="rotate(-20 12 12)"/><circle cx="12" cy="12" r="5.4" fill="#000"/><path d="M1.7 12a10.3 3.3 0 0 0 20.6 0" transform="rotate(-20 12 12)"/></svg>';
+  saturn.addEventListener('pointerdown', e => { e.stopPropagation(); saturn.classList.add('down'); });
+  saturn.addEventListener('pointerup', () => saturn.classList.remove('down'));
+  saturn.addEventListener('click', e => { e.stopPropagation(); if (nativeIn) nativeIn.blur(); openUniversal(); });
+  bar.append(cancel, add, files, saturn, kbd, enter);
   pressable(cancel, () => finishEdit(false));
   pressable(enter, () => finishEdit(true));
   // the file picker needs a real click to open on iPad
@@ -1929,7 +2006,7 @@ document.addEventListener('keydown', e => {
 });
 function resetAll() {
   if (editing || edOpen) return;
-  closeRadial();
+  closeRadial(); dropFocus(true);
   unlock();
   [...wins].forEach(o => { o.closed = true; o.v.pause(); o.v.removeAttribute('src'); o.v.load(); o.el.remove(); });
   wins.length = 0;
@@ -1942,7 +2019,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-17-101359';
+const BUILD = '2026-11-17-103924';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
@@ -1981,6 +2058,7 @@ addEventListener('pageshow', e => { if (e.persisted) checkForUpdate(); });
     saveDbs();
   }
   items = itemsFromDb();
+  applyLook();
   render();
 })();
 render();
@@ -2026,7 +2104,7 @@ function openRadial(o, x, y, pid) {
   });
   const rot = [0, 180, 90, -90, 45, -45, 135, -135].find(fits) || 0;
 
-  const dim = document.createElement('div'); dim.className = 'rdim';
+  const F = focusOn(o), dim = F.dim, halo = F.halo;
   const lay = document.createElement('div'); lay.className = 'rlay';
   const svg = document.createElementNS(NS, 'svg'); svg.setAttribute('class', 'goo');
   svg.innerHTML = gooDefs() + '<g filter="url(#rgoo)"></g>';
@@ -2053,10 +2131,9 @@ function openRadial(o, x, y, pid) {
   const up = P.y - SUB_D > 50 ? -1 : 1;
   const sub = { ...RAD_SUB, c: sc, ic: sic, px: x, py: y, vx: 0, vy: 0, r: 0, vr: 0, tx: x, ty: y, tr: 0,
                 anchor: P, home: { x: P.x, y: P.y + up * SUB_D }, up };
-  document.body.append(dim, lay);
-  o.el.style.zIndex = 150001;
-  rad = { o, x, y, pid, dim, lay, bubs, sub, par, all: [...bubs, sub], armed: false, core, coreR: 4, hov: null, dragging: true, fx: x, fy: y, closing: false, raf: 0 };
-  void dim.offsetWidth; dim.classList.add('on');
+  document.body.append(lay);
+  rad = { o, x, y, pid, dim, halo, lay, bubs, sub, par, all: [...bubs, sub], armed: false, core, coreR: 4, hov: null, dragging: true, fx: x, fy: y, closing: false, raf: 0 };
+
   radTargets();
   radLoop();
 
@@ -2073,6 +2150,43 @@ function openRadial(o, x, y, pid) {
     else closeRadial();
   });
   lay.addEventListener('click', e => e.stopPropagation());
+}
+
+/* focus: the held video stays lit with a prism halo, everything else dims; tap elsewhere to leave */
+let focus = null;
+function focusOn(o) {
+  if (focus && focus.o === o) return focus;
+  dropFocus(true);
+  const dim = document.createElement('div'); dim.className = 'rdim';
+  const halo = document.createElement('div'); halo.className = 'rhalo'; halo.append(document.createElement('i'));
+  dim.style.pointerEvents = 'auto';
+  dim.addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); });
+  dim.addEventListener('pointerup', e => { e.stopPropagation(); if (!rad) dropFocus(); });
+  dim.addEventListener('click', e => e.stopPropagation());
+  document.body.append(dim, halo);
+  o.el.style.zIndex = 150001;
+  const f = focus = { o, dim, halo, raf: 0 };
+  const pad = 10;
+  const place = () => {
+    Object.assign(halo.style, { left: o.left - pad + 'px', top: o.top - pad + 'px', width: o.w + pad * 2 + 'px', height: o.h + pad * 2 + 'px' });
+    dim.style.setProperty('--px', o.left + o.w / 2 + 'px');
+    dim.style.setProperty('--py', o.top + o.h / 2 + 'px');
+    dim.style.setProperty('--pr', Math.max(o.w, o.h) * .85 + 160 + 'px');
+  };
+  const track = () => { if (focus !== f) return; if (o.closed) { dropFocus(); return; } place(); f.raf = requestAnimationFrame(track); };
+  place(); track();
+  void dim.offsetWidth; dim.classList.add('on'); halo.classList.add('on');
+  return f;
+}
+function dropFocus(now) {
+  if (!focus) return;
+  const f = focus; focus = null;
+  cancelAnimationFrame(f.raf);
+  if (!f.o.closed) f.o.el.style.zIndex = f.o.z;
+  f.dim.classList.remove('on'); f.halo.classList.remove('on');
+  f.dim.style.pointerEvents = 'none';
+  const kill = () => { f.dim.remove(); f.halo.remove(); };
+  if (now) kill(); else setTimeout(kill, 380);
 }
 
 function radPick(fx, fy) {
@@ -2161,10 +2275,7 @@ function radRelease(isUp) {
   if (!rad) return;
   rad.dragging = false;
   if (isUp && rad.hov) { radRun(rad.hov); return; }
-  const d = Math.hypot(rad.fx - rad.x, rad.fy - rad.y);
-  if (!isUp || d > 40) { closeRadial(); return; }
-  // let go in the middle: the blob stays for tapping
-  rad.hov = null; rad.fx = rad.x; rad.fy = rad.y; radTargets();
+  closeRadial();   // bubbles melt away; the video stays in focus until you tap elsewhere
 }
 
 function radRun(b) {
@@ -2172,6 +2283,7 @@ function radRun(b) {
   setTimeout(() => {
     closeRadial();
     if (o.closed) return;
+    if (b.k !== 'audio') dropFocus();
     if (b.k === 'audio') { if (lockWin === o) unlock(); else setLock(o); }
     else if (b.k === 'crop') openCrop(o.it);
     else if (b.k === 'trim') openTrim(o.it);
@@ -2183,11 +2295,9 @@ function closeRadial(now) {
   if (!rad) return;
   const r = rad; rad = null;
   r.closing = true;
-  if (!r.o.closed) r.o.el.style.zIndex = r.o.z;
-  r.dim.classList.remove('on');
   r.lay.style.pointerEvents = 'none';
   for (const b of r.all) { b.tx = r.x; b.ty = r.y; b.tr = 0; }
-  const kill = () => { cancelAnimationFrame(r.raf); r.lay.remove(); r.dim.remove(); };
+  const kill = () => { cancelAnimationFrame(r.raf); r.lay.remove(); };
   if (now) kill(); else setTimeout(kill, 380);
 }
 
@@ -2200,15 +2310,14 @@ function saveItemMeta(it, key, val) {
   if (e) { if (val) e[key] = val; else delete e[key]; saveDbs(); }
   for (const o of wins) if (o.it.name === it.name) {
     o.it[key] = val;
-    if (key === 'crop') applyCrop(o, true);
-    if (key === 'trim' && val) try { o.v.currentTime = val.start; } catch (err) {}
-    if (key === 'mode' || (o.it.mode && key === 'trim')) applyMode(o);
+    refreshWin(o, key === 'crop');
   }
 }
 
 // Show only the cropped part of the video inside its window, and size the window to it.
 function applyCrop(o, animate) {
-  const c = o.it.crop, v = o.v;
+  const c = o.preview ? o.it.crop : effCrop(o), v = o.v;
+  o.ec = c;
   if (c) Object.assign(v.style, { position: 'absolute', objectFit: 'fill', maxWidth: 'none',
     width: 100 / c.w + '%', height: 100 / c.h + '%', left: -c.x / c.w * 100 + '%', top: -c.y / c.h * 100 + '%' });
   else v.style.cssText = '';
@@ -2227,14 +2336,14 @@ function applyCrop(o, animate) {
 // keep trimmed windows looping inside their range
 setInterval(() => {
   for (const o of wins) {
-    const t = o.it.trim; if (!t || o.closed) continue;
+    const t = o.et; if (!t || o.closed) continue;
     const ct = o.v.currentTime;
     if (ct >= t.end - 0.04 || ct < t.start - 0.3) try { o.v.currentTime = t.start; } catch (err) {}
   }
 }, 80);
 
 function edShell(it, onOk, onReset) {
-  closeRadial(true);
+  closeRadial(true); dropFocus();
   edOpen = true;
   const ed = document.createElement('div'); ed.className = 'ed';
   const stage = document.createElement('div'); stage.className = 'ed-stage';
@@ -2368,8 +2477,9 @@ function analyzeEnds(src, dur) {
     // the end: last hard change in the final few seconds = where the end card begins
     const W = Math.min(8, dur * .5), t0 = Math.max(lead, dur - W);
     const ts = [], fs = [];
-    for (let t = t0; t < dur - .04; t += STEP) { const f = await grab(t); if (!f) break; ts.push(t); fs.push(f); }
-    const G = 3, ch = fs.map((f, i) => i >= G ? diff(f, fs[i - G]) : 0);
+    const CS = .2;   // coarse pass, then refine around the cut
+    for (let t = t0; t < dur - .04; t += CS) { const f = await grab(t); if (!f) break; ts.push(t); fs.push(f); }
+    const G = 2, ch = fs.map((f, i) => i >= G ? diff(f, fs[i - G]) : 0);
     const sorted = ch.filter(x => x > 0).sort((a, b) => a - b), med = sorted[sorted.length >> 1] || 0;
     let cut = -1;
     for (let i = G; i < ch.length; i++) {
@@ -2380,13 +2490,20 @@ function analyzeEnds(src, dur) {
       // step back to the exact frame where it changes
       let k = cut - G + 1;
       for (let j = cut - G + 1; j <= cut; j++) if (diff(fs[j], fs[j - 1]) > diff(fs[k], fs[k - 1])) k = j;
-      const at = ts[k];
+      let at = ts[k], best = -1;
+      const before = fs[k - 1];
+      for (let t = ts[k - 1] + .04; t <= ts[k] + .001; t += .04) {
+        const f = await grab(t); if (!f) break;
+        const dd = diff(f, before);
+        if (dd > best * 1.0 && dd > .5 * diff(fs[k], before)) { at = t; break; }
+        best = Math.max(best, dd);
+      }
       out.push({ side: 'end', at: +at.toFixed(2), label: 'end card' });
     } else {
       // no card: maybe it fades out to black
       let i = fs.length - 1;
       while (i >= 0 && luma(fs[i]) <= DARK) i--;
-      const at = i >= 0 ? ts[i] + STEP : null;
+      const at = i >= 0 ? ts[i] + CS : null;
       if (at != null && dur - at >= .3) out.push({ side: 'end', at: +at.toFixed(2), label: 'black end' });
     }
     v.removeAttribute('src'); v.load();
@@ -2415,7 +2532,7 @@ const fxPreviews = new Set();
 let fxRaf = 0;
 
 function applyMode(o) {
-  const m = o.it.mode, d = m && FX[m];
+  const m = o.preview ? o.it.mode : effMode(o), d = m && FX[m];
   o.v.playbackRate = (d && d.rate) || 1;
   if (!d || d.rate) {
     if (o.fx) { o.fx.cv.remove(); o.fx = null; o.el.classList.remove('fx'); }
@@ -2431,7 +2548,7 @@ function applyMode(o) {
   Object.assign(f, { mode: m, d, frames: [], lastCt: -1, lastNow: 0, dir: -1, capturing: !!d.buf });
   f.ctx.clearRect(0, 0, f.cv.width, f.cv.height);
   if (d.buf) {
-    const tr = o.it.trim, s = tr ? tr.start : 0, e = tr ? tr.end : (o.v.duration || 1e9);
+    const tr = o.preview ? o.it.trim : o.et, s = tr ? tr.start : 0, e = tr ? tr.end : (o.v.duration || 1e9);
     f.s = s; f.L = Math.max(.3, Math.min(d.L, e - s));
     try { o.v.currentTime = s; } catch (err) {}
   }
@@ -2455,8 +2572,10 @@ function fxFrame(o, now) {
   const dpr = Math.min(devicePixelRatio || 1, 2);
   const W = Math.round(o.el.clientWidth * dpr), H = Math.round(o.el.clientHeight * dpr);
   if (!W || !H) return;
+  // off screen: nothing to draw (capture still runs so the loop is ready)
+  if (!o.preview && !f.capturing && (o.left > innerWidth || o.top > innerHeight || o.left + o.w < 0 || o.top + o.h < 0)) { f.lastNow = now; return; }
   if (f.cv.width !== W || f.cv.height !== H) { f.cv.width = W; f.cv.height = H; }
-  const c = o.it.crop || { x: 0, y: 0, w: 1, h: 1 };
+  const c = (o.preview ? o.it.crop : o.ec) || { x: 0, y: 0, w: 1, h: 1 };
   const draw = (src, sw, sh) => ctx.drawImage(src, c.x * sw, c.y * sh, c.w * sw, c.h * sh, 0, 0, W, H);
   const dt = f.lastNow ? Math.min(.1, (now - f.lastNow) / 1000) : 0; f.lastNow = now;
   const ct = v.currentTime, fresh = ct !== f.lastCt;
@@ -2467,7 +2586,9 @@ function fxFrame(o, now) {
     if (f.capturing) {
       const lastT = f.frames.length ? f.frames[f.frames.length - 1].t : -1;
       if (fresh && ct >= f.s - .03 && ct <= f.s + f.L && (ct - lastT >= .031 || ct < lastT)) {
-        const sc = Math.min(1, 480 / Math.max(v.videoWidth, v.videoHeight));
+        // only as many pixels as the window shows (cropped), capped at 480
+        const need = Math.max(W / c.w / v.videoWidth, H / c.h / v.videoHeight) * 1.1;
+        const sc = Math.min(1, 480 / Math.max(v.videoWidth, v.videoHeight), Math.max(need, .15));
         const fc = document.createElement('canvas');
         fc.width = Math.round(v.videoWidth * sc); fc.height = Math.round(v.videoHeight * sc);
         fc.getContext('2d').drawImage(v, 0, 0, fc.width, fc.height);
@@ -2549,6 +2670,180 @@ function openPlayback(it) {
   requestAnimationFrame(fit);
   addEventListener('resize', fit);
   const iv = setInterval(() => { if (!S.ed.isConnected) { fxPreviews.delete(pv); clearInterval(iv); } }, 300);
+}
+
+
+/* ================= universal adjustments (per database, layered over each video's own edits) ================= */
+const UNI_DEF = { autoEnd: false, autoStart: false, maxLen: 0, ratio: 0, mode: 'off',
+                  look: 'none', bri: 100, con: 100, sat: 100, hue: 0, blend: 'normal', corners: 0 };
+const LOOKS = {
+  none: '', mono: 'grayscale(1)', noir: 'grayscale(1) contrast(1.45) brightness(.9)',
+  faded: 'contrast(.82) saturate(.7) brightness(1.08)', warm: 'sepia(.3) saturate(1.25) hue-rotate(-10deg)',
+  cool: 'saturate(1.1) hue-rotate(14deg) brightness(1.02)', vivid: 'saturate(1.7) contrast(1.12)',
+  dream: 'blur(.6px) saturate(1.3) brightness(1.1)', invert: 'invert(1) hue-rotate(180deg)'
+};
+const RATIOS = [['off', 0], ['1:1', 1], ['4:5', .8], ['3:4', .75], ['9:16', 9 / 16], ['16:9', 16 / 9]];
+const uni = () => Object.assign({}, UNI_DEF, curDb().uni || {});
+
+function lookFilter(u) {
+  const parts = [LOOKS[u.look] || ''];
+  if (u.bri !== 100) parts.push(`brightness(${u.bri / 100})`);
+  if (u.con !== 100) parts.push(`contrast(${u.con / 100})`);
+  if (u.sat !== 100) parts.push(`saturate(${u.sat / 100})`);
+  if (u.hue) parts.push(`hue-rotate(${u.hue}deg)`);
+  return parts.join(' ').trim() || 'none';
+}
+function applyLook(u = uni()) {
+  const r = document.documentElement.style;
+  r.setProperty('--uf', lookFilter(u));
+  r.setProperty('--ub', u.blend);
+  r.setProperty('--ur', u.corners + 'px');
+}
+
+// the crop/trim/mode a window actually uses
+function effCrop(o) {
+  const u = uni(), v = o.v;
+  if (u.ratio && v.videoWidth) {
+    const q = u.ratio / (v.videoWidth / v.videoHeight);
+    const w = q >= 1 ? 1 : q, h = q >= 1 ? 1 / q : 1;
+    return { x: (1 - w) / 2, y: (1 - h) / 2, w, h };
+  }
+  return o.it.crop;
+}
+function effMode(o) { const u = uni(); return u.mode !== 'off' ? (u.mode === 'normal' ? null : u.mode) : o.it.mode; }
+function computeTrim(o) {
+  const u = uni(), dur = o.v.duration;
+  if (!dur || !isFinite(dur)) { o.et = o.it.trim; return; }
+  let s = o.it.trim ? o.it.trim.start : 0, e = o.it.trim ? o.it.trim.end : dur;
+  if ((u.autoEnd || u.autoStart) && !o.auto) {
+    o.auto = 'busy';
+    analyzeEnds(o.it.src, dur).then(list => { if (!o.closed) { o.auto = list; computeTrim(o); applyMode(o); } });
+  }
+  if (Array.isArray(o.auto)) for (const sg of o.auto) {
+    if (sg.side === 'end' && u.autoEnd) e = Math.min(e, sg.at);
+    if (sg.side === 'start' && u.autoStart) s = Math.max(s, sg.at);
+  }
+  if (u.maxLen) e = Math.min(e, s + u.maxLen);
+  const full = s < .05 && e > dur - .05;
+  const prev = o.et;
+  o.et = full ? null : { start: s, end: Math.max(e, s + .2) };
+  if (o.et && (!prev || prev.start !== o.et.start)) try { o.v.currentTime = o.et.start; } catch (err) {}
+}
+function refreshWin(o, animate) {
+  if (o.closed) return;
+  applyCrop(o, animate);
+  computeTrim(o);
+  applyMode(o);
+}
+
+function openUniversal() {
+  closeRadial(true); dropFocus();
+  edOpen = true;
+  const db = curDb(), before = db.uni ? { ...db.uni } : null;
+  let u = uni();
+  const live = () => { db.uni = { ...u }; applyLook(u); for (const o of wins) refreshWin(o, true); preview(); };
+
+  const ed = document.createElement('div'); ed.className = 'ed uni';
+  const head = document.createElement('div'); head.className = 'uni-head';
+  const pbox = document.createElement('div'); pbox.className = 'uni-prev';
+  const pv = document.createElement('video'); pv.muted = true; pv.loop = true; pv.playsInline = true; pv.setAttribute('playsinline', ''); pv.autoplay = true;
+  const sample = items[0];
+  if (sample) { pv.src = sample.src; pbox.append(pv); } else pbox.classList.add('empty');
+  const ttl = document.createElement('div'); ttl.className = 'uni-ttl';
+  ttl.innerHTML = `everything in <b>${(db.name || '').replace(/[<&]/g, '')}</b>`;
+  head.append(pbox, ttl);
+  const list = document.createElement('div'); list.className = 'uni-list';
+  const foot = document.createElement('div'); foot.className = 'ed-foot';
+  const no = document.createElement('span'); no.className = 'no'; no.textContent = 'cancel';
+  const ok = document.createElement('span'); ok.className = 'ok'; ok.textContent = 'ok';
+  foot.append(no, ok);
+  ed.append(head, list, foot);
+  document.body.append(ed);
+  void ed.offsetWidth; ed.classList.add('on');
+  ['pointerdown', 'click'].forEach(t => ed.addEventListener(t, e => e.stopPropagation()));
+
+  // preview tile: first video, with the crop, look and corners applied
+  function preview() {
+    if (!sample) return;
+    const vw = pv.videoWidth || 16, vh = pv.videoHeight || 9;
+    const c = u.ratio ? (() => { const q = u.ratio / (vw / vh), w = q >= 1 ? 1 : q, h = q >= 1 ? 1 / q : 1; return { x: (1 - w) / 2, y: (1 - h) / 2, w, h }; })() : (sample.crop || { x: 0, y: 0, w: 1, h: 1 });
+    const a = (vw * c.w) / (vh * c.h), H = 150, W = Math.min(260, H * a);
+    pbox.style.width = W + 'px'; pbox.style.height = W / a + 'px';
+    pbox.style.borderRadius = Math.min(u.corners, 40) * .6 + 'px';
+    Object.assign(pv.style, { width: 100 / c.w + '%', height: 100 / c.h + '%', left: -c.x / c.w * 100 + '%', top: -c.y / c.h * 100 + '%', filter: lookFilter(u) });
+  }
+  pv.addEventListener('loadedmetadata', preview);
+
+  const section = name => { const h = document.createElement('div'); h.className = 'uni-sec'; h.textContent = name; list.append(h); };
+  const row = (label, ctl, note) => {
+    const r = document.createElement('div'); r.className = 'uni-row';
+    const l = document.createElement('div'); l.className = 'uni-lab'; l.textContent = label;
+    if (note) { const n = document.createElement('small'); n.textContent = note; l.append(n); }
+    r.append(l, ctl); list.append(r); return r;
+  };
+  const toggle = key => {
+    const t = document.createElement('div'); t.className = 'uni-tog' + (u[key] ? ' on' : '');
+    t.addEventListener('click', () => { u[key] = !u[key]; t.classList.toggle('on', u[key]); live(); });
+    return t;
+  };
+  const chips = (key, opts) => {
+    const w = document.createElement('div'); w.className = 'uni-chips';
+    const els = opts.map(([lab, val]) => {
+      const s = document.createElement('span'); s.textContent = lab;
+      s.classList.toggle('sel', u[key] === val);
+      s.addEventListener('click', () => { u[key] = val; els.forEach(e => e.classList.toggle('sel', e === s)); live(); });
+      w.append(s); return s;
+    });
+    w.sync = () => els.forEach((e, i) => e.classList.toggle('sel', u[key] === opts[i][1]));
+    return w;
+  };
+  const slider = (key, min, max, unit) => {
+    const w = document.createElement('div'); w.className = 'uni-sl';
+    const inp = document.createElement('input'); inp.type = 'range'; inp.min = min; inp.max = max; inp.value = u[key];
+    const val = document.createElement('span');
+    const show = () => { val.textContent = unit === '°' ? u[key] + '°' : u[key] + '%'; };
+    inp.addEventListener('input', () => { u[key] = +inp.value; show(); live(); });
+    inp.addEventListener('dblclick', () => { u[key] = UNI_DEF[key]; inp.value = u[key]; show(); live(); });
+    w.sync = () => { inp.value = u[key]; show(); };
+    show(); w.append(inp, val); return w;
+  };
+
+  section('length');
+  row('cut end cards', toggle('autoEnd'), 'instagram outros & fades to black');
+  row('cut black starts', toggle('autoStart'));
+  row('max length', chips('maxLen', [['off', 0], ['3s', 3], ['5s', 5], ['10s', 10], ['15s', 15], ['30s', 30]]), 'loops the first part');
+  section('frame');
+  row('same crop', chips('ratio', RATIOS), 'centre crop, replaces each crop');
+  row('corners', chips('corners', [['square', 0], ['soft', 8], ['round', 18], ['pill', 60]]));
+  section('playback');
+  row('same mode', chips('mode', [['off', 'off'], ...PLAY_MODES.map(m => [m, m])]), 'replaces each mode');
+  section('look');
+  const lookC = chips('look', Object.keys(LOOKS).map(k => [k, k]));
+  row('filter', lookC);
+  const sls = [['brightness', 'bri', 40, 160], ['contrast', 'con', 40, 180], ['saturation', 'sat', 0, 220], ['hue', 'hue', -180, 180]]
+    .map(([lab, k, a, b]) => { const s = slider(k, a, b, k === 'hue' ? '°' : '%'); row(lab, s); return s; });
+  row('blend', chips('blend', ['normal', 'screen', 'lighten', 'difference', 'exclusion'].map(b => [b, b])), 'how overlapping videos mix');
+  const rs = document.createElement('div'); rs.className = 'uni-reset'; rs.textContent = 'reset all';
+  rs.addEventListener('click', () => {
+    u = { ...UNI_DEF }; live();
+    list.querySelectorAll('.uni-tog').forEach((t, i) => t.classList.toggle('on', !!u[['autoEnd', 'autoStart'][i]]));
+    list.querySelectorAll('.uni-chips').forEach(c => c.sync()); sls.forEach(s => s.sync());
+  });
+  list.append(rs);
+
+  const close = () => {
+    edOpen = false; ed.classList.remove('on');
+    setTimeout(() => { pv.removeAttribute('src'); pv.load(); ed.remove(); }, 240);
+  };
+  no.addEventListener('click', () => {
+    if (before) db.uni = before; else delete db.uni;
+    applyLook(); for (const o of wins) refreshWin(o, true); close();
+  });
+  ok.addEventListener('click', () => {
+    const clean = {}; for (const k in u) if (u[k] !== UNI_DEF[k]) clean[k] = u[k];
+    if (Object.keys(clean).length) db.uni = clean; else delete db.uni;
+    saveDbs(); applyLook(); close();
+  });
 }
 
 const fmtT = t => { t = Math.max(0, t); const m = Math.floor(t / 60), s = t - m * 60; return m + ':' + (s < 10 ? '0' : '') + s.toFixed(1); };
