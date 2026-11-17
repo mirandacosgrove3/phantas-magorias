@@ -435,6 +435,24 @@
   /* no selection, loupe or callout anywhere except real text fields */
   *:not(input):not(textarea) { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-user-drag: none; }
   video, canvas, svg, img { -webkit-touch-callout: none; }
+  /* ---- memory & performance ---- */
+  .pf-top { display: flex; gap: 34px; padding-top: 16px; flex-wrap: wrap; }
+  .pf-top b { display: block; font-weight: 200; font-size: 30px; font-variant-numeric: tabular-nums; }
+  .pf-top b.ok { color: #2ee6d2; } .pf-top b.mid { color: #ffb347; } .pf-top b.bad { color: #ff3b4a; }
+  .pf-top small { font-size: 11.5px; color: rgba(255,255,255,.45); line-height: 1.4; }
+  .pf-secsub { float: right; letter-spacing: .04em; text-transform: none; color: rgba(255,255,255,.28); }
+  .pf-row { display: flex; align-items: center; gap: 16px; padding: 11px 0; border-bottom: .5px solid rgba(255,255,255,.07); }
+  .pf-cost { display: flex; align-items: center; gap: 10px; flex: none; width: 150px; }
+  .pf-cost small { font-size: 11px; width: 44px; text-align: right; }
+  .pf-bar { position: relative; flex: 1; height: 1.5px; background: rgba(255,255,255,.1); border-radius: 1px; overflow: hidden; }
+  .pf-bar i { position: absolute; left: 0; top: 0; bottom: 0; background: rgba(255,255,255,.5); }
+  .pf-bar.h i, small.h { background: #ff3b4a; color: #ff3b4a; } small.h { background: none; }
+  .pf-bar.m i { background: #ffb347; } small.m { color: #ffb347; }
+  .pf-bar.l i { background: #2ee6d2; } small.l { color: #2ee6d2; }
+  small.t { color: rgba(255,255,255,.35); }
+  .pf-x { font-size: 12.5px; color: rgba(255,255,255,.45); padding: 8px 6px; cursor: pointer; flex: none; }
+  .pf-tip { font-size: 13px; color: rgba(255,255,255,.7); padding: 10px 0; border-bottom: .5px solid rgba(255,255,255,.07); }
+  .pf-tip::before { content: "→ "; color: #ff6fb5; }
 </style>
 </head>
 <body>
@@ -2087,7 +2105,7 @@ function resetAll() {
 /* ================= self-update ================= */
 // Bump BUILD whenever the page changes. On launch / when the app comes back to the
 // foreground it checks the live copy (skipping every cache) and reloads if it's newer.
-const BUILD = '2026-11-17-114921';
+const BUILD = '2026-11-17-115328';
 async function checkForUpdate() {
   try {
     if (!/^https?:/.test(location.protocol)) return;
@@ -2142,6 +2160,7 @@ const ICONS = {
   rename: '<text x="12" y="17" text-anchor="middle" class="tx">Aa</text>',
   planet: '<ellipse cx="12" cy="12" rx="10.3" ry="3.3" transform="rotate(-20 12 12)"/><circle cx="12" cy="12" r="5.4" fill="#1e1e22"/><path d="M1.7 12a10.3 3.3 0 0 0 20.6 0" transform="rotate(-20 12 12)"/>',
   camera: '<path d="M3 8.2a1.8 1.8 0 0 1 1.8-1.8h2.3L8.6 4.5h6.8l1.5 1.9h2.3A1.8 1.8 0 0 1 21 8.2v9.3a1.8 1.8 0 0 1-1.8 1.8H4.8A1.8 1.8 0 0 1 3 17.5z"/><circle cx="12" cy="12.6" r="3.6"/>',
+  gauge:  '<path d="M3.6 16.5a8.6 8.6 0 1 1 16.8 0"/><path d="M12 15.5 16.2 10"/><circle cx="12" cy="15.8" r="1.1"/>',
   files:  '<path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/><path d="M3.5 10.5h17"/>'
 };
 // hold a video: sound / crop / trim (+ playback branching up out of trim)
@@ -2149,7 +2168,7 @@ const WIN_MENU = { turn: 'rotate', items: [{ k: 'audio', a: -90 }, { k: 'crop', 
                    subs: [{ k: 'play', parent: 'trim', a: -90 }] };
 // hold a title: a Y. rename up-left, universal (planet) up-right with videos + databases branching off it
 const TITLE_MENU = { turn: 'flip', rest: 60, core: 30, items: [{ k: 'rename', a: -128 }, { k: 'planet', a: -52 }],
-                     subs: [{ k: 'camera', parent: 'planet', a: -68 }, { k: 'files', parent: 'planet', a: 18 }] };
+                     subs: [{ k: 'camera', parent: 'planet', a: -68 }, { k: 'files', parent: 'planet', a: 18 }, { k: 'gauge', parent: 'planet', a: 76 }] };
 const SUB_D = 72;
 // resting: bubbles fused into one blob; the one you drag toward stretches out and splits off
 const RAD_REST = 54, RAD_OUT = 100, RAD_BR = 31;
@@ -2337,6 +2356,7 @@ function openTitleRadial(it, x, y, pid) {
       else if (k === 'planet') openUniversal();
       else if (k === 'camera') openVideos();
       else if (k === 'files') toggleDbPanel();
+      else if (k === 'gauge') openPerf();
     }
   });
 }
@@ -3286,6 +3306,170 @@ function openVideos() {
   draw();
   done.addEventListener('click', () => {
     edOpen = false; vmRefresh = null; ed.classList.remove('on');
+    setTimeout(() => ed.remove(), 240);
+  });
+}
+
+
+/* ================= memory & performance (gauge bubble) ================= */
+// smoothness is measured all the time, cheaply, so the panel can show how things ran before it opened
+const perf = { frames: [], worst: [] };
+(function fpsSample(now) {
+  const f = perf.frames; f.push(now);
+  while (f.length && now - f[0] > 5000) f.shift();
+  requestAnimationFrame(fpsSample);
+})(performance.now());
+function fpsNow() {
+  const f = perf.frames; if (f.length < 2) return { fps: 0, jank: 0 };
+  const recent = f.filter(t => f[f.length - 1] - t <= 1000);
+  let jank = 0; for (let i = 1; i < f.length; i++) if (f[i] - f[i - 1] > 50) jank++;
+  return { fps: recent.length, jank };
+}
+const MB = n => n >= 1e9 ? (n / 1e9).toFixed(2) + ' GB' : n >= 1e6 ? (n / 1e6).toFixed(1) + ' MB' : Math.max(0, Math.round(n / 1e3)) + ' KB';
+const FILTER_WEIGHT = { none: 0, mono: 1, noir: 1.3, faded: 1.1, warm: 1.2, cool: 1.1, vivid: 1.2, dream: 3, invert: 1.1 };
+
+function measure() {
+  const u = uni(), dpr = Math.min(devicePixelRatio || 1, 2);
+  const live = wins.filter(o => !o.closed);
+  const rows = live.map(o => {
+    const v = o.v, vw = v.videoWidth || 0, vh = v.videoHeight || 0;
+    const rate = v.playbackRate || 1;
+    // decoding: pixels per second relative to one 1080p30 video
+    const decode = (vw * vh * 30 * rate) / (1920 * 1080 * 30);
+    // a playing video keeps a handful of decoded frames around
+    const vidMem = vw * vh * 1.5 * 6;
+    const f = o.fx;
+    const bufMem = f && f.frames ? f.frames.reduce((s, fr) => s + fr.c.width * fr.c.height * 4, 0) : 0;
+    const cvMem = f ? f.cv.width * f.cv.height * 4 : 0;
+    const screenPx = o.w * o.h * dpr * dpr;
+    const fxDraw = f ? (f.d.trail ? 1.2 : f.d.buf ? .6 : 0) * screenPx / (1e6) : 0;
+    const mode = (f && f.mode) || (rate !== 1 ? (rate < 1 ? 'slo-mo' : 'fast') : null);
+    const tags = [];
+    if (mode) tags.push(mode);
+    if (o.et) tags.push('trim');
+    if (o.ec) tags.push('crop');
+    if (lockWin === o) tags.push('sound lock');
+    if (f && f.capturing) tags.push('recording frames');
+    const cost = decode * 3 + (bufMem + cvMem) / 40e6 + fxDraw;
+    return { o, name: o.it.title, vw, vh, decode, vidMem, bufMem, cvMem, fxMem: bufMem + cvMem, mode, tags, cost, screenPx };
+  }).sort((a, b) => b.cost - a.cost);
+
+  const screenAll = rows.reduce((s, r) => s + r.screenPx, 0);
+  const uniRows = [];
+  const fw = (FILTER_WEIGHT[u.look] || 0) + (u.bri !== 100) * .3 + (u.con !== 100) * .3 + (u.sat !== 100) * .3 + (u.hue ? .3 : 0);
+  if (fw) uniRows.push({ name: 'filter · ' + (u.look === 'none' ? 'adjustments' : u.look), note: `redrawn on all ${rows.length} open`, cost: fw * screenAll / 2e6 });
+  if (u.blend !== 'normal') uniRows.push({ name: 'blend · ' + u.blend, note: 'every overlap is mixed each frame', cost: screenAll / 2.5e6 });
+  if (u.corners) uniRows.push({ name: 'corners', note: 'clipping, very light', cost: rows.length * .02 });
+  if (u.ratio) uniRows.push({ name: 'same crop', note: 'no cost: just framing', cost: 0 });
+  if (u.mode !== 'off') uniRows.push({ name: 'same mode · ' + u.mode, note: 'counted per video below', cost: 0 });
+  if (u.autoEnd || u.autoStart || u.cutStart || u.cutEnd || u.maxLen) uniRows.push({ name: 'length cuts', note: 'one jump per loop, very light', cost: rows.length * .01 });
+  const pending = (u.autoEnd || u.autoStart) ? items.filter(it => !autoStore[it.name]).length : 0;
+  if (scanning || pending) uniRows.push({ name: 'end-card scanning', note: scanning ? `working in the background · ${pending} left` : `${pending} waiting`, cost: scanning ? .8 : 0 });
+
+  const modes = {};
+  for (const r of rows) if (r.mode) { const m = modes[r.mode] || (modes[r.mode] = { n: 0, mem: 0, cost: 0 }); m.n++; m.mem += r.fxMem; m.cost += r.cost - r.decode * 3; }
+
+  const totals = {
+    decode: rows.reduce((s, r) => s + r.decode, 0),
+    mem: rows.reduce((s, r) => s + r.vidMem + r.fxMem, 0),
+    fxMem: rows.reduce((s, r) => s + r.fxMem, 0),
+    open: rows.length
+  };
+  return { rows, uniRows, modes, totals, fps: fpsNow(), pending };
+}
+
+function openPerf() {
+  closeRadial(true); dropFocus();
+  edOpen = true;
+  const ed = document.createElement('div'); ed.className = 'ed uni vm pf';
+  const head = document.createElement('div'); head.className = 'vm-head';
+  const list = document.createElement('div'); list.className = 'uni-list';
+  const foot = document.createElement('div'); foot.className = 'ed-foot';
+  const done = document.createElement('span'); done.className = 'ok'; done.textContent = 'done';
+  foot.append(done);
+  ed.append(head, list, foot);
+  document.body.append(ed);
+  void ed.offsetWidth; ed.classList.add('on');
+  ['pointerdown', 'click'].forEach(t => ed.addEventListener(t, e => e.stopPropagation()));
+  let est = null;
+  (async () => { try { est = navigator.storage && navigator.storage.estimate ? await navigator.storage.estimate() : null; } catch (err) {} })();
+
+  const level = c => c > 3 ? ['heavy', 'h'] : c > 1.2 ? ['medium', 'm'] : c > .15 ? ['light', 'l'] : ['tiny', 't'];
+  const bar = (frac, cls) => `<span class="pf-bar ${cls || ''}"><i style="width:${Math.max(2, Math.min(100, frac * 100))}%"></i></span>`;
+  const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+
+  function draw() {
+    if (!ed.isConnected) return;
+    const m = measure(), t = m.totals;
+    const smooth = m.fps.fps >= 55 ? 'smooth' : m.fps.fps >= 40 ? 'a little choppy' : 'struggling';
+    head.innerHTML = `<div class="uni-ttl"><b>memory</b> · what's using what</div>
+      <div class="pf-top">
+        <div><b class="${m.fps.fps >= 55 ? 'ok' : m.fps.fps >= 40 ? 'mid' : 'bad'}">${m.fps.fps}</b><small>fps · ${smooth}</small></div>
+        <div><b>${t.open}</b><small>videos playing</small></div>
+        <div><b>${t.decode.toFixed(1)}×</b><small>decoding load<br>(1× = one 1080p video)</small></div>
+        <div><b>${MB(t.mem)}</b><small>est. video memory</small></div>
+      </div>
+      <div class="vm-store">${m.fps.jank ? `${m.fps.jank} stutter${m.fps.jank > 1 ? 's' : ''} in the last 5 seconds · ` : ''}measured live; memory is estimated from each video's size and effects (Safari doesn't reveal the real number)</div>`;
+    list.innerHTML = '';
+    const sec = (name, sub) => { const h = document.createElement('div'); h.className = 'uni-sec'; h.innerHTML = esc(name) + (sub ? `<span class="pf-secsub">${esc(sub)}</span>` : ''); list.append(h); };
+    const row = (name, meta, cost, maxCost, extra) => {
+      const r = document.createElement('div'); r.className = 'pf-row';
+      const [lab, cls] = level(cost);
+      r.innerHTML = `<div class="vm-main"><div class="vm-nm">${esc(name)}</div><div class="vm-sub">${meta}</div></div>
+        <div class="pf-cost">${bar(maxCost ? cost / maxCost : 0, cls)}<small class="${cls}">${lab}</small></div>`;
+      if (extra) r.append(extra);
+      list.append(r);
+    };
+
+    const maxC = Math.max(1, ...m.rows.map(r => r.cost), ...m.uniRows.map(r => r.cost));
+    sec('open videos', m.rows.length ? 'heaviest first' : '');
+    if (!m.rows.length) { const e = document.createElement('div'); e.className = 'vm-empty'; e.textContent = 'nothing playing'; list.append(e); }
+    for (const r of m.rows) {
+      const bits = [];
+      if (r.vw) bits.push(`${r.vw}×${r.vh}`);
+      bits.push(`decode ${r.decode.toFixed(2)}×`);
+      bits.push(MB(r.vidMem + r.fxMem));
+      if (r.tags.length) bits.push('<em>' + r.tags.map(esc).join(' + ') + '</em>');
+      const x = document.createElement('span'); x.className = 'pf-x'; x.textContent = 'close';
+      x.addEventListener('click', () => { closeWin(r.o); draw(); });
+      row(r.name, bits.join(' · '), r.cost, maxC, x);
+    }
+
+    const ml = Object.entries(m.modes);
+    if (ml.length) {
+      sec('playback effects', 'grouped');
+      for (const [mode, g] of ml.sort((a, b) => b[1].cost - a[1].cost)) {
+        const how = FX[mode] && FX[mode].buf ? 'keeps recorded frames in memory' : FX[mode] && FX[mode].trail ? 'redraws every frame' : 'just a speed change, free';
+        row(mode, `${g.n} video${g.n > 1 ? 's' : ''} · ${MB(g.mem)} · ${how}`, g.cost, maxC);
+      }
+    }
+
+    sec('universal', 'applies to everything');
+    if (!m.uniRows.length) { const e = document.createElement('div'); e.className = 'vm-empty'; e.textContent = 'nothing universal is on'; list.append(e); }
+    for (const r of m.uniRows.sort((a, b) => b.cost - a.cost)) row(r.name, esc(r.note), r.cost, maxC);
+
+    sec('stored', 'takes space, not speed');
+    const total = [...blobs.values()].reduce((s, b) => s + (b.size || 0), 0);
+    row(`${blobs.size} videos on this iPad`, `${MB(total)}${est && est.quota ? ` · about ${MB(Math.max(0, est.quota - (est.usage || 0)))} free` : ''}`, 0, maxC);
+    row('saved scans & settings', `${Object.keys(autoStore).length} end-card scans · ${dbState.dbs.length} database${dbState.dbs.length > 1 ? 's' : ''}`, 0, maxC);
+
+    // quick wins
+    const tips = [];
+    const big = m.rows.find(r => r.vw * r.vh >= 3840 * 2160 * .9);
+    if (big) tips.push(`${big.name} is 4K. It decodes like ~4 normal videos`);
+    if (m.uniRows.find(r => r.name.startsWith('filter · dream'))) tips.push('the dream filter blurs every video every frame, the costliest look');
+    if (t.fxMem > 150e6) tips.push('boomerang-style effects are holding a lot of frames, so fewer at once helps');
+    if (t.decode > 6) tips.push('lots of videos decoding at once; closing a few will help the most');
+    if (tips.length) {
+      sec('what would help most');
+      for (const tip of tips) { const d = document.createElement('div'); d.className = 'pf-tip'; d.textContent = tip; list.append(d); }
+    }
+  }
+
+  draw();
+  const iv = setInterval(() => { if (!ed.isConnected) { clearInterval(iv); return; } draw(); }, 700);
+  done.addEventListener('click', () => {
+    edOpen = false; ed.classList.remove('on');
     setTimeout(() => ed.remove(), 240);
   });
 }

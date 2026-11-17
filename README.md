@@ -35,3 +35,4 @@ Video manager: every stored video with size, length, resolution, which databases
 Universal: "tidy up now" (arrange) lays the open videos out once in rows that fill the screen at each video's own shape (no cropping). Auto-cut scans are saved per video and run in the background for the whole list (and new imports) while a cut toggle is on, so new videos are treated the moment they open.
 The rename bar is now just cancel / iPad keyboard / OK; + videos, databases and the planet live in the title hold menu.
 Universal also has "open all" (opens every video in the list one after another) and "cut off start / cut off end" (a strict number of seconds shaved off every video).
+Memory manager (gauge, branching off the planet below the folder): live fps and stutters, decoding load, estimated video memory; open videos heaviest first with their effects and a close button; playback effects grouped; universal features costed; storage; and tips for what would help most.
